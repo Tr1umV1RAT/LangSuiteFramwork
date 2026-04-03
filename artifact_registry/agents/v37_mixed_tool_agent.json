@@ -1,0 +1,49 @@
+{
+  "id": "v37_mixed_tool_agent",
+  "kind": "agent",
+  "title": "v37 mixed tool agent",
+  "description": "",
+  "built_in": false,
+  "artifact": {
+    "name": "v37 mixed tool agent",
+    "artifactType": "agent",
+    "executionProfile": "langchain_agent",
+    "projectMode": "langchain",
+    "nodes": [
+      {
+        "id": "react_agent_1",
+        "type": "custom",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "data": {
+          "nodeType": "react_agent",
+          "label": "React Agent 1",
+          "params": {
+            "provider": "openai",
+            "model_name": "gpt-4o",
+            "tools_linked": [
+              "dice_tool_1",
+              "sql_lookup_1"
+            ]
+          }
+        }
+      }
+    ],
+    "edges": [],
+    "tools": [
+      {
+        "id": "dice_tool_1",
+        "type": "rpg_dice_roller"
+      },
+      {
+        "id": "sql_lookup_1",
+        "type": "sql_query",
+        "params": {
+          "db_path": "bridge_lookup.db"
+        }
+      }
+    ]
+  }
+}

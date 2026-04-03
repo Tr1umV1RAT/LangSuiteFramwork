@@ -1,0 +1,48 @@
+{
+  "id": "deep_agent_suite_starter",
+  "kind": "deep_agent",
+  "title": "Deep Agent Suite Starter",
+  "description": "Starter sémantique Deep Agents compilé canoniquement via le runtime LangGraph actuel.",
+  "built_in": true,
+  "artifact": {
+    "name": "Deep Agent Suite Starter",
+    "nodes": [
+      {
+        "id": "deep_agent_suite_1",
+        "type": "custom",
+        "position": {
+          "x": 260,
+          "y": 180
+        },
+        "data": {
+          "nodeType": "deep_agent_suite",
+          "label": "Deep Agent Suite 1",
+          "params": {
+            "target_subgraph": "",
+            "description": "Suite Deep Agents de départ.",
+            "planning_mode": "plan_execute",
+            "wrapper_mode": "opaque"
+          }
+        }
+      }
+    ],
+    "edges": [],
+    "customStateSchema": [],
+    "graphBindings": [
+      {
+        "name": "task_description",
+        "value": "",
+        "kind": "variable"
+      }
+    ],
+    "isAsync": true,
+    "artifactType": "deep_agent",
+    "executionProfile": "deepagents",
+    "runtimeSettings": {
+      "recursionLimit": 75,
+      "streamMode": "updates",
+      "debug": true,
+      "inheritParentBindings": true
+    }
+  }
+}

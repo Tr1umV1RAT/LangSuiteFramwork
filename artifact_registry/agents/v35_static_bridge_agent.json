@@ -1,0 +1,32 @@
+{
+  "id": "v35_static_bridge_agent",
+  "kind": "agent",
+  "title": "v35 static bridge agent",
+  "description": "",
+  "built_in": false,
+  "artifact": {
+    "name": "v35 static bridge agent",
+    "artifactType": "agent",
+    "executionProfile": "langchain_agent",
+    "projectMode": "langchain",
+    "nodes": [
+      {
+        "id": "static_text_1",
+        "type": "custom",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "data": {
+          "nodeType": "static_text",
+          "label": "Static Text 1",
+          "params": {
+            "text": "hello from bridge",
+            "output_key": "messages"
+          }
+        }
+      }
+    ],
+    "edges": []
+  }
+}

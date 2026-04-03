@@ -1,0 +1,3294 @@
+{
+  "artifactKinds": {
+    "graph": {
+      "label": "Graph",
+      "visible": true,
+      "libraryVisible": true,
+      "scopeKind": "project",
+      "artifactDirectory": "graphs",
+      "defaultExecutionProfile": "langgraph_async",
+      "defaultAsync": true,
+      "legacy": false,
+      "futureHook": false,
+      "internalOnly": false,
+      "description": "Primary visible LangGraph workspace surface.",
+      "rail": "trunk",
+      "surfaceLevel": "stable",
+      "advancedLibraryVisible": false,
+      "packagingEligibility": "stable",
+      "trunkDependent": true,
+      "adapterBacked": false,
+      "wrapperBacked": false,
+      "directCompile": true,
+      "directRun": true
+    },
+    "subgraph": {
+      "label": "Subgraph",
+      "visible": true,
+      "libraryVisible": true,
+      "scopeKind": "subgraph",
+      "artifactDirectory": "subgraphs",
+      "defaultExecutionProfile": "langgraph_async",
+      "defaultAsync": true,
+      "legacy": false,
+      "futureHook": false,
+      "internalOnly": false,
+      "description": "Reusable child graph surfaced through wrapper nodes and child tabs.",
+      "rail": "composition",
+      "surfaceLevel": "stable",
+      "advancedLibraryVisible": false,
+      "packagingEligibility": "stable",
+      "trunkDependent": true,
+      "adapterBacked": false,
+      "wrapperBacked": true,
+      "directCompile": true,
+      "directRun": true
+    },
+    "agent": {
+      "label": "Agent",
+      "visible": false,
+      "libraryVisible": false,
+      "scopeKind": "project",
+      "artifactDirectory": "agents",
+      "defaultExecutionProfile": "langchain_agent",
+      "defaultAsync": true,
+      "legacy": true,
+      "futureHook": true,
+      "internalOnly": true,
+      "description": "Legacy/internal higher-level artifact family retained for compatibility metadata, not a separate visible runtime.",
+      "rail": "agentic",
+      "surfaceLevel": "advanced",
+      "advancedLibraryVisible": true,
+      "packagingEligibility": "experimental",
+      "trunkDependent": true,
+      "adapterBacked": true,
+      "wrapperBacked": false,
+      "directCompile": true,
+      "directRun": true
+    },
+    "deep_agent": {
+      "label": "Deep Agent",
+      "visible": false,
+      "libraryVisible": false,
+      "scopeKind": "project",
+      "artifactDirectory": "deepagents",
+      "defaultExecutionProfile": "deepagents",
+      "defaultAsync": true,
+      "legacy": true,
+      "futureHook": true,
+      "internalOnly": true,
+      "description": "Legacy/internal future-facing family aliased into the current LangGraph trunk.",
+      "rail": "adapter",
+      "surfaceLevel": "advanced",
+      "advancedLibraryVisible": true,
+      "packagingEligibility": "experimental",
+      "trunkDependent": true,
+      "adapterBacked": true,
+      "wrapperBacked": true,
+      "directCompile": true,
+      "directRun": true
+    }
+  },
+  "executionProfiles": {
+    "langgraph_sync": {
+      "label": "LangGraph Sync",
+      "visible": true,
+      "isAsync": false,
+      "legacy": false,
+      "futureHook": false,
+      "description": "Visible synchronous execution profile for the current LangGraph trunk.",
+      "rail": "trunk",
+      "surfaceLevel": "stable",
+      "directRun": true,
+      "trunkDependent": true,
+      "adapterBacked": false
+    },
+    "langgraph_async": {
+      "label": "LangGraph Async",
+      "visible": true,
+      "isAsync": true,
+      "legacy": false,
+      "futureHook": false,
+      "description": "Visible asynchronous execution profile for the current LangGraph trunk.",
+      "rail": "trunk",
+      "surfaceLevel": "stable",
+      "directRun": true,
+      "trunkDependent": true,
+      "adapterBacked": false
+    },
+    "langchain_agent": {
+      "label": "LangChain agent shell",
+      "visible": false,
+      "isAsync": true,
+      "legacy": true,
+      "futureHook": true,
+      "description": "Advanced LangChain-flavored agent-shell profile used for editor/export surfaces.",
+      "rail": "agentic",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "directRun": true,
+      "trunkDependent": true,
+      "adapterBacked": true
+    },
+    "deepagents": {
+      "label": "DeepAgents runtime mode",
+      "visible": false,
+      "isAsync": true,
+      "legacy": true,
+      "futureHook": true,
+      "description": "Advanced DeepAgents-flavored profile with values-first streaming defaults, still trunk-backed.",
+      "rail": "adapter",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "directRun": true,
+      "trunkDependent": true,
+      "adapterBacked": true
+    }
+  },
+  "projectModes": {
+    "langgraph": {
+      "label": "LangGraph mode",
+      "description": "Primary graph/subgraph builder and runtime mode.",
+      "visible": true,
+      "surfaceLevel": "stable",
+      "runtimeEnabled": true,
+      "compileEnabled": true,
+      "advanced": false,
+      "defaultArtifactType": "graph",
+      "defaultExecutionProfile": "langgraph_async",
+      "defaultAsync": true,
+      "defaultStreamMode": "updates",
+      "trunkDependent": true,
+      "adapterBacked": false
+    },
+    "langchain": {
+      "label": "LangChain mode",
+      "description": "Advanced agent-shell authoring mode with its own node/API surface. Editor-first for now; not an in-app runtime mode.",
+      "visible": true,
+      "surfaceLevel": "advanced",
+      "runtimeEnabled": false,
+      "compileEnabled": true,
+      "advanced": true,
+      "defaultArtifactType": "agent",
+      "defaultExecutionProfile": "langchain_agent",
+      "defaultAsync": true,
+      "defaultStreamMode": "updates",
+      "trunkDependent": true,
+      "adapterBacked": true
+    },
+    "deepagents": {
+      "label": "DeepAgents mode",
+      "description": "Advanced DeepAgents-flavored mode with its own node/API surface and a values-first streaming runtime style, still backed by the current trunk.",
+      "visible": true,
+      "surfaceLevel": "advanced",
+      "runtimeEnabled": true,
+      "compileEnabled": true,
+      "advanced": true,
+      "defaultArtifactType": "deep_agent",
+      "defaultExecutionProfile": "deepagents",
+      "defaultAsync": true,
+      "defaultStreamMode": "values",
+      "trunkDependent": true,
+      "adapterBacked": true
+    }
+  },
+  "nodeDefaults": {
+    "kind": "primitive",
+    "origin": "shared",
+    "executionPlacement": "graph",
+    "executionFlavor": "inherit",
+    "compileStrategy": "canonical",
+    "quickProps": [],
+    "autoLinkTargets": [],
+    "naturalArtifactTypes": [
+      "graph",
+      "subgraph",
+      "agent",
+      "deep_agent"
+    ],
+    "naturalProfiles": [
+      "langgraph_sync",
+      "langgraph_async",
+      "langchain_agent",
+      "deepagents"
+    ],
+    "allowedEditorContexts": [
+      "project",
+      "subgraph"
+    ],
+    "futureHook": false,
+    "internalOnly": false,
+    "rail": "trunk",
+    "surfaceLevel": "stable",
+    "advancedVisible": false,
+    "trunkDependent": true,
+    "adapterBacked": false,
+    "wrapperBacked": false,
+    "directCompile": true,
+    "directRun": true,
+    "allowedProjectModes": [
+      "langgraph",
+      "langchain",
+      "deepagents"
+    ]
+  },
+  "runtimeBackedNodeTypes": [
+    "chat_output",
+    "command_node",
+    "context_trimmer",
+    "data_container",
+    "debug_print",
+    "deep_agent_suite",
+    "deep_memory_skill",
+    "deep_subagent_worker",
+    "file_loader_node",
+    "handoff_node",
+    "human_interrupt",
+    "llm_chat",
+    "logic_router",
+    "memory_checkpoint",
+    "memory_store_read",
+    "memoryreader",
+    "memorywriter",
+    "parallel_aggregator",
+    "python_executor_node",
+    "rag_retriever_local",
+    "react_agent",
+    "reduce_join",
+    "send_fanout",
+    "static_text",
+    "store_delete",
+    "store_get",
+    "store_put",
+    "store_search",
+    "subgraph_node",
+    "sub_agent",
+    "tool_api_call",
+    "tool_requests_post",
+    "tool_requests_get",
+    "tool_executor",
+    "tool_llm_worker",
+    "tool_playwright_extract_links",
+    "tool_playwright_keypress",
+    "tool_playwright_screenshot",
+    "tool_playwright_scroll",
+    "tool_playwright_wait",
+    "tool_pw_click",
+    "tool_pw_current_page",
+    "tool_pw_extract_links",
+    "tool_pw_extract_text",
+    "tool_pw_fill",
+    "tool_pw_get_elements",
+    "tool_pw_navigate",
+    "tool_python_function",
+    "tool_python_repl",
+    "tool_rest_api",
+    "tool_rpg_dice_roller",
+    "tool_sql_query",
+    "tool_sub_agent",
+    "tool_web_search",
+    "tool_duckduckgo_search",
+    "tool_brave_search",
+    "update_state_node",
+    "user_input_node",
+    "runtime_context_read",
+    "structured_output_extract",
+    "structured_output_router",
+    "tool_tavily_extract",
+    "tool_sql_list_tables",
+    "tool_sql_get_schema",
+    "tool_sql_query_check",
+    "tool_github_get_issue",
+    "tool_github_get_pull_request",
+    "tool_github_read_file",
+    "tool_github_search_issues_prs",
+    "tool_fs_list_dir",
+    "tool_fs_read_file",
+    "tool_fs_glob",
+    "tool_fs_grep",
+    "tool_fs_write_file",
+    "tool_fs_edit_file",
+    "tool_fs_apply_patch",
+    "tool_shell_command"
+  ],
+  "paletteHiddenNodeTypes": [
+    "tool_sub_agent",
+    "tool_playwright_extract_links"
+  ],
+  "nodeTypes": {
+    "llm_chat": {
+      "origin": "langgraph",
+      "summary": "Canonical LangGraph chat node.",
+      "quickProps": [
+        "chat",
+        "llm",
+        "state"
+      ],
+      "naturalArtifactTypes": [
+        "graph",
+        "subgraph"
+      ],
+      "naturalProfiles": [
+        "langgraph_sync",
+        "langgraph_async"
+      ],
+      "rail": "trunk",
+      "surfaceLevel": "stable",
+      "allowedProjectModes": [
+        "langgraph"
+      ],
+      "interactionModel": "tool_chip_and_direct_ports",
+      "uiAbstractionNotes": [
+        "The tools badge/chip is a graphical abstraction. Linking tools can compile into an explicit ToolNode loop or auto-plumbed tool execution.",
+        "Tools remain bounded to the subset explicitly linked by the circuit author. A capable model may choose among that linked set, but it does not gain global tool access.",
+        "Structured output stays on the node as authored intent, even when the compiled graph stores the parsed payload in state/custom_vars."
+      ],
+      "linkSemantics": [
+        "Linking tools provisions an authored tool subset for this node; runtime choice, when supported, stays bounded to that linked subset.",
+        "A direct edge can still coexist with tool links; the compile path may replace the literal edge with a conditional tool loop when tools are linked.",
+        "The tools handle is often many-to-one at authoring time even if the compiled graph inserts one ToolNode."
+      ],
+      "structuredOutputCapable": true,
+      "graphAbstractionKind": "semantic_tool_loop",
+      "linkMultiplicity": [
+        "Message/document/state ports behave like ordinary directed graph links.",
+        "The tools handle is many-to-one at authoring time: several tool blocks can feed one authored node.",
+        "A direct outgoing edge can coexist with tool links even though compile may synthesize a ToolNode loop."
+      ],
+      "compiledGraphRelation": "Authoring intent may compile into the authored node plus an explicit or implicit ToolNode loop, with structured output written back into graph state rather than emitted as a literal separate node.",
+      "uiSemanticHandles": [
+        "messages_in",
+        "documents_in",
+        "memory_in",
+        "messages_out",
+        "tools_in"
+      ],
+      "debugProjection": [
+        "tool links are surfaced as authored semantics",
+        "structured output is projected as state/custom_vars writes",
+        "runtime logs may mention the synthesized tool loop rather than a literal tools chip"
+      ],
+      "memorySystemKind": "memory_input_consumer",
+      "memoryDurability": "depends_on_upstream_memory_surface",
+      "memoryVisibility": "consumes_memory_input_handle",
+      "memoryConsumer": true,
+      "toolRuntimeMemoryAccessMode": "memory_input_handle_only_in_current_build",
+      "memoryRole": "memory_consumer",
+      "memoryAccessModel": "graph_memory_input_payload",
+      "toolProvisioningModel": "author_linked",
+      "toolSelectionAuthority": "bounded_model_choice",
+      "toolAccessScope": "linked_tools_only",
+      "toolResultModel": "tool_observation_loop"
+    },
+    "react_agent": {
+      "origin": "langchain",
+      "kind": "composite",
+      "summary": "Agent-flavored abstraction still compiled through the current LangGraph trunk.",
+      "quickProps": [
+        "agent",
+        "react",
+        "tools"
+      ],
+      "autoLinkTargets": [
+        "tools_in"
+      ],
+      "naturalArtifactTypes": [
+        "agent",
+        "graph"
+      ],
+      "naturalProfiles": [
+        "langchain_agent",
+        "langgraph_async"
+      ],
+      "futureHook": true,
+      "internalOnly": false,
+      "rail": "agentic",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "adapterBacked": true,
+      "trunkDependent": true,
+      "directCompile": true,
+      "directRun": true,
+      "allowedProjectModes": [
+        "langchain"
+      ],
+      "interactionModel": "tool_chip_and_direct_ports",
+      "uiAbstractionNotes": [
+        "The tools badge/chip is a graphical abstraction. Linking tools can compile into an explicit ToolNode loop or auto-plumbed tool execution.",
+        "Tools remain bounded to the subset explicitly linked by the circuit author. A capable model may choose among that linked set, but it does not gain global tool access.",
+        "Structured output stays on the node as authored intent, even when the compiled graph stores the parsed payload in state/custom_vars."
+      ],
+      "linkSemantics": [
+        "Linking tools provisions an authored tool subset for this node; runtime choice, when supported, stays bounded to that linked subset.",
+        "A direct edge can still coexist with tool links; the compile path may replace the literal edge with a conditional tool loop when tools are linked.",
+        "The tools handle is often many-to-one at authoring time even if the compiled graph inserts one ToolNode."
+      ],
+      "structuredOutputCapable": true,
+      "graphAbstractionKind": "semantic_tool_loop",
+      "linkMultiplicity": [
+        "Message/document/state ports behave like ordinary directed graph links.",
+        "The tools handle is many-to-one at authoring time: several tool blocks can feed one authored node.",
+        "A direct outgoing edge can coexist with tool links even though compile may synthesize a ToolNode loop."
+      ],
+      "compiledGraphRelation": "Authoring intent may compile into the authored node plus an explicit or implicit ToolNode loop, with agent/tool semantics preserved in runtime metadata instead of requiring one literal graph edge per internal step.",
+      "uiSemanticHandles": [
+        "messages_in",
+        "documents_in",
+        "memory_in",
+        "messages_out",
+        "tools_in"
+      ],
+      "debugProjection": [
+        "tool links are surfaced as authored semantics",
+        "runtime may project synthesized tool-loop events",
+        "structured output is projected through state/custom_vars rather than a separate visible node"
+      ],
+      "memorySystemKind": "memory_input_consumer",
+      "memoryDurability": "depends_on_upstream_memory_surface",
+      "memoryVisibility": "consumes_memory_input_handle",
+      "memoryConsumer": true,
+      "toolRuntimeMemoryAccessMode": "memory_input_handle_only_in_current_build",
+      "memoryRole": "memory_consumer",
+      "memoryAccessModel": "graph_memory_input_payload",
+      "toolProvisioningModel": "author_linked",
+      "toolSelectionAuthority": "bounded_model_choice",
+      "toolAccessScope": "linked_tools_only",
+      "toolResultModel": "tool_observation_loop"
+    },
+    "sub_agent": {
+      "origin": "langchain",
+      "kind": "composite",
+      "executionPlacement": "subgraph",
+      "summary": "Saved or wrapped LangChain agent artifact surface. Use this when you want to reference a richer agent artifact, not the canonical agent-as-tool subagent model.",
+      "quickProps": [
+        "artifact",
+        "agent",
+        "langchain",
+        "bridge",
+        "embedded"
+      ],
+      "autoLinkTargets": [
+        "tools_in"
+      ],
+      "naturalArtifactTypes": [
+        "agent"
+      ],
+      "naturalProfiles": [
+        "langchain_agent",
+        "langgraph_async",
+        "langgraph_sync"
+      ],
+      "paletteHidden": false,
+      "rail": "composition",
+      "surfaceLevel": "advanced",
+      "wrapperBacked": true,
+      "trunkDependent": true,
+      "directCompile": true,
+      "directRun": true,
+      "interactionModel": "langchain_agent_artifact_reference",
+      "uiAbstractionNotes": [
+        "This block references a saved LangChain agent artifact or wrapper-backed agent unit.",
+        "Use tool_sub_agent for the canonical subagent-as-tool model. Use subgraph_node for graph-native child graphs."
+      ],
+      "linkSemantics": [
+        "One visual node can stand for a lowered LangChain bridge, an embedded-native agent artifact, or another bounded LangChain-derived subagent form depending on metadata.",
+        "Some references reopen a source LangChain artifact instead of exposing internal compiled structure."
+      ],
+      "graphAbstractionKind": "langchain_agent_artifact_reference",
+      "linkMultiplicity": [
+        "One visual node can represent a LangChain-authored agent/subagent artifact rather than every internal step of that agent.",
+        "Its direct edges are authored as graph links even when runtime executes an embedded or lowered agent artifact under the trunk."
+      ],
+      "compiledGraphRelation": "Compiled shape depends on execution metadata: lowered LangChain bridge wrapper or embedded-native agent artifact wrapper. This node is intentionally not the graph-native child-subgraph surface.",
+      "uiSemanticHandles": [
+        "messages_in",
+        "messages_out",
+        "memory_in",
+        "tools_in"
+      ],
+      "debugProjection": [
+        "runtime/debug surfaces should identify the source LangChain artifact or subagent wrapper contract",
+        "reopen flow points back to the authored LangChain artifact rather than exposing every internal compiled step"
+      ],
+      "memorySystemKind": "memory_input_consumer",
+      "memoryDurability": "depends_on_embedded_or_lowered_langchain_artifact",
+      "memoryVisibility": "consumes_memory_input_handle",
+      "memoryConsumer": true,
+      "toolRuntimeMemoryAccessMode": "memory_input_handle_only_in_current_build",
+      "memoryRole": "langchain_agent_artifact_memory_consumer",
+      "memoryAccessModel": "graph_memory_input_payload_forwarded_to_langchain_agent_artifact",
+      "compileAliasType": "sub_agent",
+      "compileStrategy": "canonical"
+    },
+    "rag_retriever_local": {
+      "origin": "langgraph",
+      "kind": "composite",
+      "executionPlacement": "memory",
+      "summary": "Local vector retrieval against a persisted Chroma store.",
+      "quickProps": [
+        "rag",
+        "retrieval",
+        "local"
+      ],
+      "naturalArtifactTypes": [
+        "graph",
+        "subgraph"
+      ],
+      "naturalProfiles": [
+        "langgraph_sync",
+        "langgraph_async"
+      ],
+      "rail": "trunk",
+      "surfaceLevel": "stable",
+      "memorySystemKind": "retrieval_index",
+      "memoryDurability": "local_vector_index_persisted_outside_graph_state",
+      "memoryVisibility": "retrieved_documents_payload",
+      "memoryLastEntryKey": "documents",
+      "memoryRole": "retrieval_surface",
+      "memoryAccessModel": "local_vector_index_query"
+    },
+    "tool_sub_agent": {
+      "origin": "langchain",
+      "kind": "composite",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Canonical subagent surface: a LangChain-style agent callable as a tool, configured in the project Subagent Library and invoked ephemerally by a parent agent.",
+      "quickProps": [
+        "subagent",
+        "tool",
+        "langchain",
+        "ephemeral"
+      ],
+      "autoLinkTargets": [
+        "tools_in"
+      ],
+      "naturalArtifactTypes": [
+        "graph",
+        "agent"
+      ],
+      "naturalProfiles": [
+        "langgraph_async",
+        "langchain_agent"
+      ],
+      "fauxNode": true,
+      "paletteHidden": false,
+      "futureHook": false,
+      "internalOnly": false,
+      "rail": "composition",
+      "surfaceLevel": "stable",
+      "advancedVisible": true,
+      "wrapperBacked": false,
+      "trunkDependent": true,
+      "directCompile": true,
+      "directRun": true,
+      "interactionModel": "subagent_library_tool_reference",
+      "uiAbstractionNotes": [
+        "A subagent is an agent used as a tool by a parent agent. It is configured in the Subagent Library, then referenced by this block.",
+        "Subagents do not imply independent persistent memory by default; they are invoked ephemerally per call."
+      ],
+      "graphAbstractionKind": "langchain_subagent_tool_reference",
+      "compiledGraphRelation": "Compiles to a callable LangChain-style subagent tool wrapper using a project-level Subagent Library definition.",
+      "uiSemanticHandles": [
+        "tool_out"
+      ],
+      "debugProjection": [
+        "runtime/debug surfaces should identify the selected subagent library entry and the parent agent invoking it"
+      ],
+      "memoryRole": "ephemeral_subagent_tool",
+      "memoryAccessModel": "subagent_library_definition_with_ephemeral_invocation",
+      "toolRuntimeMemoryAccessMode": "no_persistent_subagent_memory_by_default",
+      "preferredSurface": true,
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_llm_worker": {
+      "origin": "langchain",
+      "kind": "composite",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Specialist worker tool surface. Useful for delegated tasks without implying a full separate agent runtime.",
+      "quickProps": [
+        "worker",
+        "tool",
+        "specialist"
+      ],
+      "autoLinkTargets": [
+        "tools_in"
+      ],
+      "naturalArtifactTypes": [
+        "graph",
+        "agent",
+        "deep_agent"
+      ],
+      "naturalProfiles": [
+        "langchain_agent",
+        "deepagents",
+        "langgraph_async"
+      ],
+      "fauxNode": true,
+      "futureHook": true,
+      "internalOnly": false,
+      "rail": "agentic",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "adapterBacked": true,
+      "trunkDependent": true,
+      "directCompile": true,
+      "directRun": true,
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "memory_store_read": {
+      "origin": "langgraph",
+      "kind": "composite",
+      "executionPlacement": "memory",
+      "summary": "Cross-thread store/profile read in the current runtime; use this for user/profile-scoped long-lived store access rather than lightweight helper reads.",
+      "quickProps": [
+        "memory",
+        "store",
+        "profile"
+      ],
+      "naturalArtifactTypes": [
+        "graph",
+        "subgraph",
+        "deep_agent"
+      ],
+      "naturalProfiles": [
+        "langgraph_async",
+        "langgraph_sync",
+        "deepagents"
+      ],
+      "interactionModel": "cross_thread_store_lookup",
+      "linkSemantics": [
+        "One state input can drive a store lookup whose user/profile scope is derived from configured state keys.",
+        "The output is a memory payload written back into graph state, not a direct inspection of checkpoint internals."
+      ],
+      "uiAbstractionNotes": [
+        "This is long-lived store/profile access, not just peeking at the current step state.",
+        "The compiled node performs a store lookup even though the canvas only shows one simple memory block."
+      ],
+      "graphAbstractionKind": "store_lookup_abstraction",
+      "linkMultiplicity": [
+        "Usually one state input to one memory payload output; the real namespace/user resolution happens through params and runtime context."
+      ],
+      "compiledGraphRelation": "Compiles to a store-backed lookup keyed by namespace + user identity rather than a direct edge-level memory graph.",
+      "uiSemanticHandles": [
+        "state_in",
+        "memory_out"
+      ],
+      "debugProjection": [
+        "state/debug surfaces should identify namespace/user-derived lookup results when available"
+      ],
+      "memorySystemKind": "runtime_store_profile",
+      "memoryDurability": "store_runtime_user_selectable_backend",
+      "memoryVisibility": "normalized_profile_payload",
+      "memoryLastEntryKey": "output_key",
+      "memoryBackendSelectable": true,
+      "memoryBackendOptions": [
+        "in_memory",
+        "sqlite_local"
+      ],
+      "toolRuntimeMemoryReady": false,
+      "memoryRole": "profile_store_reader",
+      "memoryAccessModel": "runtime_store_lookup_by_user_namespace",
+      "preferredSurface": "memory_access",
+      "consolidationGroup": "memory_access_legacy",
+      "legacyHelperSurface": true
+    },
+    "memoryreader": {
+      "origin": "shared",
+      "kind": "composite",
+      "executionPlacement": "memory",
+      "summary": "Lightweight helper read surface. In the current build it still resolves through the runtime store rather than peeking raw checkpoint/thread state.",
+      "quickProps": [
+        "memory",
+        "read"
+      ],
+      "interactionModel": "store_like_memory_read",
+      "linkSemantics": [
+        "A single state input can trigger one memory read result written back into state.",
+        "Although it looks like a lightweight state helper, it currently compiles against the runtime store."
+      ],
+      "uiAbstractionNotes": [
+        "This surface is visually lighter than memory_store_read but still goes through store access in the current build.",
+        "That distinction must remain visible to avoid confusing thread state with long-lived store state."
+      ],
+      "graphAbstractionKind": "memory_reader_abstraction",
+      "compiledGraphRelation": "Compiles to a store read against a fixed memory namespace/key pattern rather than a pure in-memory state peek.",
+      "uiSemanticHandles": [
+        "state_in",
+        "memory_out"
+      ],
+      "debugProjection": [
+        "debug/state should treat returned memory data as store-derived, not raw checkpoint state"
+      ],
+      "memorySystemKind": "runtime_store_read_helper",
+      "memoryDurability": "store_runtime_user_selectable_backend",
+      "memoryVisibility": "normalized_memory_payload",
+      "memoryLastEntryKey": "output_key",
+      "memoryBackendSelectable": true,
+      "memoryBackendOptions": [
+        "in_memory",
+        "sqlite_local"
+      ],
+      "toolRuntimeMemoryReady": false,
+      "memoryRole": "store_read_helper",
+      "memoryAccessModel": "runtime_store_helper_key_read",
+      "preferredSurface": "memory_access",
+      "consolidationGroup": "memory_access_legacy",
+      "legacyHelperSurface": true
+    },
+    "memorywriter": {
+      "origin": "shared",
+      "kind": "composite",
+      "executionPlacement": "memory",
+      "summary": "Lightweight helper write surface. In the current build it still persists through the runtime store rather than mutating checkpoint/thread state directly.",
+      "quickProps": [
+        "memory",
+        "write"
+      ],
+      "interactionModel": "store_like_memory_write",
+      "linkSemantics": [
+        "A single input path can persist one selected state value as a memory item.",
+        "The canvas does not show the namespace/key plumbing explicitly even though the compiled node writes into the runtime store."
+      ],
+      "uiAbstractionNotes": [
+        "This surface looks lightweight but currently writes through the store layer.",
+        "Users should not confuse it with plain in-thread state mutation."
+      ],
+      "graphAbstractionKind": "memory_writer_abstraction",
+      "compiledGraphRelation": "Compiles to a store write into a fixed memory namespace/key pattern rather than a raw custom_vars update.",
+      "uiSemanticHandles": [
+        "data_in"
+      ],
+      "debugProjection": [
+        "debug/state should identify persisted memory writes separately from ordinary state updates"
+      ],
+      "memorySystemKind": "runtime_store_write_helper",
+      "memoryDurability": "store_runtime_user_selectable_backend",
+      "memoryVisibility": "write_receipt_or_meta",
+      "memoryLastEntryKey": "state_key_to_save",
+      "memoryBackendSelectable": true,
+      "memoryBackendOptions": [
+        "in_memory",
+        "sqlite_local"
+      ],
+      "toolRuntimeMemoryReady": false,
+      "memoryRole": "store_write_helper",
+      "memoryAccessModel": "runtime_store_helper_key_write",
+      "preferredSurface": "store_put",
+      "consolidationGroup": "memory_write_legacy",
+      "legacyHelperSurface": true
+    },
+    "deep_agent_suite": {
+      "origin": "deepagents",
+      "kind": "suite",
+      "executionPlacement": "suite",
+      "compileStrategy": "alias",
+      "compileAliasType": "sub_agent",
+      "summary": "Advanced DeepAgents-flavored suite surface. Currently adapter-backed and trunk-compiled rather than a fully separate runtime family.",
+      "quickProps": [
+        "suite",
+        "planner",
+        "subagents"
+      ],
+      "naturalArtifactTypes": [
+        "deep_agent",
+        "agent",
+        "graph"
+      ],
+      "naturalProfiles": [
+        "deepagents",
+        "langchain_agent",
+        "langgraph_async"
+      ],
+      "futureHook": true,
+      "internalOnly": false,
+      "rail": "adapter",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "adapterBacked": true,
+      "wrapperBacked": true,
+      "trunkDependent": true,
+      "directCompile": true,
+      "directRun": true,
+      "allowedProjectModes": [
+        "deepagents"
+      ],
+      "interactionModel": "legacy_suite_alias",
+      "uiAbstractionNotes": [
+        "This surface is a product-level suite abstraction, not a separate native runtime graph in the current build.",
+        "Opening or inspecting it should explain clearly that current compilation routes through trunk-compatible surfaces."
+      ],
+      "linkSemantics": [
+        "Edges from this node remain ordinary graph edges even though the surface is suite-flavored.",
+        "The visual node can out-express the currently compiled runtime shape."
+      ],
+      "graphAbstractionKind": "suite_alias_surface",
+      "linkMultiplicity": [
+        "Can accept ordinary graph edges and tool semantics while still compiling as an adapter-backed alias.",
+        "The visual suite node is broader than the current compiled representation."
+      ],
+      "compiledGraphRelation": "Currently compiles as an alias-backed trunk surface rather than a fully separate DeepAgents runtime graph.",
+      "debugProjection": [
+        "runtime/debug output should identify the suite surface as adapter-backed",
+        "the visual suite node does not imply a second root runtime"
+      ]
+    },
+    "deep_subagent_worker": {
+      "origin": "deepagents",
+      "kind": "composite",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "compileStrategy": "alias",
+      "compileAliasType": "tool_llm_worker",
+      "summary": "Advanced DeepAgents worker surface currently compiled as an adapter-backed specialist tool.",
+      "quickProps": [
+        "worker",
+        "tool",
+        "specialist"
+      ],
+      "autoLinkTargets": [
+        "tools_in"
+      ],
+      "naturalArtifactTypes": [
+        "deep_agent",
+        "agent",
+        "graph"
+      ],
+      "naturalProfiles": [
+        "deepagents",
+        "langchain_agent",
+        "langgraph_async"
+      ],
+      "fauxNode": true,
+      "futureHook": true,
+      "internalOnly": false,
+      "rail": "adapter",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "adapterBacked": true,
+      "trunkDependent": true,
+      "directCompile": true,
+      "directRun": true,
+      "allowedProjectModes": [
+        "deepagents"
+      ]
+    },
+    "deep_memory_skill": {
+      "origin": "deepagents",
+      "kind": "composite",
+      "executionPlacement": "memory",
+      "compileStrategy": "alias",
+      "compileAliasType": "memory_store_read",
+      "summary": "Legacy DeepAgents memory skill mapped onto the canonical store read.",
+      "quickProps": [
+        "memory",
+        "skill",
+        "profile"
+      ],
+      "naturalArtifactTypes": [
+        "deep_agent",
+        "agent",
+        "graph"
+      ],
+      "naturalProfiles": [
+        "deepagents",
+        "langchain_agent",
+        "langgraph_async"
+      ],
+      "futureHook": true,
+      "internalOnly": false,
+      "rail": "adapter",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "adapterBacked": true,
+      "trunkDependent": true,
+      "directCompile": true,
+      "directRun": true,
+      "allowedProjectModes": [
+        "deepagents"
+      ]
+    },
+    "user_input_node": {
+      "origin": "shared",
+      "summary": "Bootstrap input node that seeds graph state from user or test payloads.",
+      "quickProps": [
+        "input",
+        "state"
+      ],
+      "rail": "services",
+      "surfaceLevel": "stable"
+    },
+    "debug_print": {
+      "origin": "shared",
+      "summary": "Debug helper that mirrors selected state into run/debug surfaces.",
+      "quickProps": [
+        "debug",
+        "print"
+      ],
+      "rail": "services",
+      "surfaceLevel": "stable"
+    },
+    "static_text": {
+      "origin": "shared",
+      "summary": "Static text/value emitter for prompts, labels, and deterministic payloads.",
+      "quickProps": [
+        "text",
+        "constant"
+      ],
+      "rail": "services",
+      "surfaceLevel": "stable"
+    },
+    "python_executor_node": {
+      "origin": "shared",
+      "kind": "composite",
+      "executionPlacement": "runtime",
+      "summary": "Advanced free-code Python block. Powerful, environment-dependent, and less portable than structured nodes.",
+      "quickProps": [
+        "python",
+        "code",
+        "advanced"
+      ],
+      "rail": "services",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "allowedProjectModes": [
+        "langgraph",
+        "langchain",
+        "deepagents"
+      ],
+      "interactionModel": "free_code_block",
+      "linkSemantics": [
+        "Graph edges only describe data-flow shape; the internal semantics are defined by arbitrary Python code.",
+        "One simple visual node can therefore hide multiple side effects, derived values, or control decisions."
+      ],
+      "uiAbstractionNotes": [
+        "This is intentionally a free-code escape hatch.",
+        "It is more powerful but less portable, less inspectable, and less statically understandable than structured nodes."
+      ],
+      "graphAbstractionKind": "opaque_code_runtime",
+      "linkMultiplicity": [
+        "The node presents one compact graph shape even though the code can implement richer internal logic."
+      ],
+      "compiledGraphRelation": "Compiles to an exec-based Python block; the graph only constrains input/output attachment, not internal behavior.",
+      "uiSemanticHandles": [
+        "data_in",
+        "data_out"
+      ],
+      "debugProjection": [
+        "run/debug output may include stdout-like or custom result payloads rather than strongly typed structured events"
+      ]
+    },
+    "data_container": {
+      "origin": "shared",
+      "kind": "composite",
+      "summary": "Structured variable container that seeds or merges custom state values.",
+      "quickProps": [
+        "state",
+        "bindings",
+        "variables"
+      ],
+      "rail": "services",
+      "surfaceLevel": "stable"
+    },
+    "chat_output": {
+      "origin": "shared",
+      "summary": "Terminal chat/message output surface for graph or agent responses.",
+      "quickProps": [
+        "output",
+        "messages"
+      ],
+      "rail": "services",
+      "surfaceLevel": "stable"
+    },
+    "tool_executor": {
+      "origin": "langgraph",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Explicit ToolNode surface. Useful when you want tool execution shown as a first-class graph step rather than auto-inserted plumbing.",
+      "quickProps": [
+        "toolnode",
+        "executor",
+        "explicit"
+      ],
+      "rail": "services",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "interactionModel": "explicit_or_auto_tool_loop",
+      "uiAbstractionNotes": [
+        "This surface exists because some users want tool execution visible as a graph step even though the compiler can auto-insert a ToolNode loop from linked tools.",
+        "Use this when the circuit author wants tool execution represented as an explicit workflow step instead of delegating bounded choice to a tool-capable model node."
+      ],
+      "linkSemantics": [
+        "May be used explicitly or synthesized implicitly from linked tools on agent/llm nodes."
+      ],
+      "graphAbstractionKind": "explicit_or_synthesized_tool_runtime",
+      "linkMultiplicity": [
+        "May appear as one explicit graph step, or be synthesized from many tool links on an agent-like node.",
+        "The same authored intent can therefore have a literal node or only runtime/tool-loop projection depending on compile strategy."
+      ],
+      "compiledGraphRelation": "Can map 1:1 to a literal ToolNode or be omitted from authoring entirely and synthesized by compilation from linked tools.",
+      "uiSemanticHandles": [
+        "state_in",
+        "state_out"
+      ],
+      "debugProjection": [
+        "run/debug surfaces may show explicit ToolNode execution even when the authoring surface used only tool chips/links"
+      ],
+      "toolProvisioningModel": "explicit_step",
+      "toolSelectionAuthority": "runtime_step",
+      "toolAccessScope": "explicit_tool_step",
+      "toolResultModel": "state_transition"
+    },
+    "logic_router": {
+      "origin": "langgraph",
+      "kind": "composite",
+      "summary": "Conditional router reading a state field and choosing the next labeled edge.",
+      "quickProps": [
+        "router",
+        "state",
+        "conditional"
+      ],
+      "rail": "trunk",
+      "surfaceLevel": "stable"
+    },
+    "context_trimmer": {
+      "origin": "langgraph",
+      "kind": "composite",
+      "summary": "Context/history trimming helper for message-heavy workflows.",
+      "quickProps": [
+        "context",
+        "trim",
+        "messages"
+      ],
+      "rail": "trunk",
+      "surfaceLevel": "stable",
+      "memorySystemKind": "context_window_trim",
+      "memoryDurability": "ephemeral_thread_state",
+      "memoryVisibility": "messages_state_delta",
+      "memoryLastEntryKey": "messages",
+      "memoryRole": "context_window_manager",
+      "memoryAccessModel": "thread_state_message_trimming"
+    },
+    "parallel_aggregator": {
+      "origin": "langgraph",
+      "kind": "composite",
+      "summary": "Parallel fan-in helper that merges several state inputs into one output key.",
+      "quickProps": [
+        "parallel",
+        "fan-in",
+        "merge"
+      ],
+      "rail": "trunk",
+      "surfaceLevel": "stable"
+    },
+    "human_interrupt": {
+      "origin": "langgraph",
+      "kind": "primitive",
+      "summary": "Human-in-the-loop interrupt marker compiled through the runtime checkpoint flow.",
+      "quickProps": [
+        "interrupt",
+        "hitl",
+        "pause"
+      ],
+      "rail": "trunk",
+      "surfaceLevel": "stable"
+    },
+    "memory_checkpoint": {
+      "origin": "langgraph",
+      "kind": "primitive",
+      "executionPlacement": "memory",
+      "summary": "Checkpoint marker that enables pause/resume and per-thread persistence behavior.",
+      "quickProps": [
+        "checkpoint",
+        "thread",
+        "memory"
+      ],
+      "rail": "services",
+      "surfaceLevel": "stable",
+      "memoryRole": "checkpoint_enabler",
+      "memoryAccessModel": "thread_state_checkpointing",
+      "graphAbstractionKind": "graph_scope_marker",
+      "interactionModel": "graph_scope_toggle_marker",
+      "linkSemantics": [],
+      "uiSemanticHandles": [],
+      "linkMultiplicity": [],
+      "debugProjection": [
+        "graph scope marker",
+        "checkpoint enabled at compile time",
+        "checkpoint snapshots available per step when a checkpointer is configured"
+      ],
+      "uiAbstractionNotes": [
+        "This surface does not represent a literal runtime node step.",
+        "It acts as a graph-scope marker that enables checkpointing/persistence at compile time.",
+        "It may remain detached on the canvas by design; that does not invalidate the graph."
+      ],
+      "compiledGraphRelation": "Compiles to a graph-level checkpointer configuration rather than a traversed node in the runtime graph.",
+      "graphScopeMarker": true,
+      "detachedAllowed": true,
+      "graphScopeExplanation": "Detached by design: this marker enables graph-level checkpointing when the graph is compiled. It is not a step-local state-capture node."
+    },
+    "update_state_node": {
+      "origin": "langgraph",
+      "kind": "composite",
+      "summary": "Direct state mutation helper for targeted key updates.",
+      "quickProps": [
+        "state",
+        "update"
+      ],
+      "rail": "services",
+      "surfaceLevel": "stable"
+    },
+    "file_loader_node": {
+      "origin": "shared",
+      "kind": "composite",
+      "summary": "Document/file loader that pushes structured content into graph state.",
+      "quickProps": [
+        "file",
+        "documents",
+        "loader"
+      ],
+      "rail": "services",
+      "surfaceLevel": "stable"
+    },
+    "tool_python_repl": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Advanced Python REPL tool surface. Powerful but environment-dependent and non-portable across hosts.",
+      "quickProps": [
+        "tool",
+        "python",
+        "code"
+      ],
+      "rail": "services",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_python_function": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Advanced inline Python function tool surface. Powerful but environment-dependent and non-portable across hosts.",
+      "quickProps": [
+        "tool",
+        "python",
+        "code"
+      ],
+      "rail": "services",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_web_search": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Tavily provider-backed search tool surface.",
+      "quickProps": [
+        "tool",
+        "tavily",
+        "search",
+        "config"
+      ],
+      "rail": "services",
+      "surfaceLevel": "stable",
+      "providerBacked": true,
+      "providerKind": "tavily",
+      "providerLabel": "Tavily",
+      "toolkitBacked": false,
+      "toolFamily": "tavily",
+      "toolFamilyLabel": "Tavily tools",
+      "sessionBacked": false,
+      "statefulness": "stateless",
+      "permissionLevel": "read_only",
+      "configRequired": true,
+      "interactionModel": "provider_backed_search",
+      "graphAbstractionKind": "single_tool_surface",
+      "compiledGraphRelation": "Compiles to the Tavily-backed web_search runtime tool.",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_rest_api": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Structured REST API tool surface for bounded external calls.",
+      "quickProps": [
+        "tool",
+        "api",
+        "rest"
+      ],
+      "rail": "services",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_api_call": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Generic API call tool surface for explicitly configured integrations.",
+      "quickProps": [
+        "tool",
+        "api",
+        "http"
+      ],
+      "rail": "services",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_sql_query": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Read-only SQL query tool surface. Mutation requests are blocked by preflight in this pass.",
+      "quickProps": [
+        "tool",
+        "sql",
+        "read-only"
+      ],
+      "rail": "services",
+      "surfaceLevel": "stable",
+      "toolkitBacked": true,
+      "toolFamily": "sql",
+      "toolFamilyLabel": "SQL toolkit",
+      "providerBacked": false,
+      "sessionBacked": false,
+      "statefulness": "stateless",
+      "permissionLevel": "read_only",
+      "configRequired": true,
+      "interactionModel": "database_toolkit_member",
+      "graphAbstractionKind": "toolkit_member_surface",
+      "compiledGraphRelation": "Compiles to the sql_query runtime tool with read-only-first semantics.",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_rpg_dice_roller": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Deterministic utility tool surface used for safe bridge/runtime proofing.",
+      "quickProps": [
+        "tool",
+        "utility",
+        "dice"
+      ],
+      "rail": "services",
+      "surfaceLevel": "stable",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_pw_navigate": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Playwright browser-session navigation surface.",
+      "quickProps": [
+        "tool",
+        "playwright",
+        "browser",
+        "session"
+      ],
+      "rail": "services",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "toolkitBacked": true,
+      "toolFamily": "playwright",
+      "toolFamilyLabel": "Browser interaction family",
+      "providerBacked": false,
+      "sessionBacked": true,
+      "statefulness": "session",
+      "permissionLevel": "mixed",
+      "configRequired": false,
+      "interactionModel": "browser_session_toolkit_member",
+      "graphAbstractionKind": "session_backed_toolkit_member",
+      "compiledGraphRelation": "Compiles to a Playwright browser-session runtime tool that shares page context with other Playwright tools.",
+      "consolidationGroup": "playwright_browser_family",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_pw_click": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Playwright browser-session click surface.",
+      "quickProps": [
+        "tool",
+        "playwright",
+        "browser",
+        "session"
+      ],
+      "rail": "services",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "toolkitBacked": true,
+      "toolFamily": "playwright",
+      "toolFamilyLabel": "Browser interaction family",
+      "providerBacked": false,
+      "sessionBacked": true,
+      "statefulness": "session",
+      "permissionLevel": "mixed",
+      "configRequired": false,
+      "interactionModel": "browser_session_toolkit_member",
+      "graphAbstractionKind": "session_backed_toolkit_member",
+      "compiledGraphRelation": "Compiles to a Playwright browser-session runtime tool that shares page context with other Playwright tools.",
+      "consolidationGroup": "playwright_browser_family",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_pw_current_page": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Playwright browser-session current page surface.",
+      "quickProps": [
+        "tool",
+        "playwright",
+        "browser",
+        "session"
+      ],
+      "rail": "services",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "toolkitBacked": true,
+      "toolFamily": "playwright",
+      "toolFamilyLabel": "Browser interaction family",
+      "providerBacked": false,
+      "sessionBacked": true,
+      "statefulness": "session",
+      "permissionLevel": "read_only",
+      "configRequired": false,
+      "interactionModel": "browser_session_toolkit_member",
+      "graphAbstractionKind": "session_backed_toolkit_member",
+      "compiledGraphRelation": "Compiles to a Playwright browser-session runtime tool that shares page context with other Playwright tools.",
+      "consolidationGroup": "playwright_browser_family",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_pw_fill": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Playwright browser-session form fill surface.",
+      "quickProps": [
+        "tool",
+        "playwright",
+        "browser",
+        "session"
+      ],
+      "rail": "services",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "toolkitBacked": true,
+      "toolFamily": "playwright",
+      "toolFamilyLabel": "Browser interaction family",
+      "providerBacked": false,
+      "sessionBacked": true,
+      "statefulness": "session",
+      "permissionLevel": "mixed",
+      "configRequired": false,
+      "interactionModel": "browser_session_toolkit_member",
+      "graphAbstractionKind": "session_backed_toolkit_member",
+      "compiledGraphRelation": "Compiles to a Playwright browser-session runtime tool that shares page context with other Playwright tools.",
+      "consolidationGroup": "playwright_browser_family",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_playwright_wait": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Playwright browser-session wait surface.",
+      "quickProps": [
+        "tool",
+        "playwright",
+        "browser",
+        "session"
+      ],
+      "rail": "services",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "toolkitBacked": true,
+      "toolFamily": "playwright",
+      "toolFamilyLabel": "Browser interaction family",
+      "providerBacked": false,
+      "sessionBacked": true,
+      "statefulness": "session",
+      "permissionLevel": "read_only",
+      "configRequired": false,
+      "interactionModel": "browser_session_toolkit_member",
+      "graphAbstractionKind": "session_backed_toolkit_member",
+      "compiledGraphRelation": "Compiles to a Playwright browser-session runtime tool that shares page context with other Playwright tools.",
+      "consolidationGroup": "playwright_browser_family",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_playwright_scroll": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Playwright browser-session scroll surface.",
+      "quickProps": [
+        "tool",
+        "playwright",
+        "browser",
+        "session"
+      ],
+      "rail": "services",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "toolkitBacked": true,
+      "toolFamily": "playwright",
+      "toolFamilyLabel": "Browser interaction family",
+      "providerBacked": false,
+      "sessionBacked": true,
+      "statefulness": "session",
+      "permissionLevel": "mixed",
+      "configRequired": false,
+      "interactionModel": "browser_session_toolkit_member",
+      "graphAbstractionKind": "session_backed_toolkit_member",
+      "compiledGraphRelation": "Compiles to a Playwright browser-session runtime tool that shares page context with other Playwright tools.",
+      "consolidationGroup": "playwright_browser_family",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_playwright_keypress": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Playwright browser-session keyboard surface.",
+      "quickProps": [
+        "tool",
+        "playwright",
+        "browser",
+        "session"
+      ],
+      "rail": "services",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "toolkitBacked": true,
+      "toolFamily": "playwright",
+      "toolFamilyLabel": "Browser interaction family",
+      "providerBacked": false,
+      "sessionBacked": true,
+      "statefulness": "session",
+      "permissionLevel": "mixed",
+      "configRequired": false,
+      "interactionModel": "browser_session_toolkit_member",
+      "graphAbstractionKind": "session_backed_toolkit_member",
+      "compiledGraphRelation": "Compiles to a Playwright browser-session runtime tool that shares page context with other Playwright tools.",
+      "consolidationGroup": "playwright_browser_family",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_pw_extract_text": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Playwright browser-session text extraction surface.",
+      "quickProps": [
+        "tool",
+        "playwright",
+        "extract",
+        "browser",
+        "session"
+      ],
+      "rail": "services",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "toolkitBacked": true,
+      "toolFamily": "playwright",
+      "toolFamilyLabel": "Browser interaction family",
+      "providerBacked": false,
+      "sessionBacked": true,
+      "statefulness": "session",
+      "permissionLevel": "read_only",
+      "configRequired": false,
+      "interactionModel": "browser_session_toolkit_member",
+      "graphAbstractionKind": "session_backed_toolkit_member",
+      "compiledGraphRelation": "Compiles to a Playwright browser-session runtime tool that shares page context with other Playwright tools.",
+      "consolidationGroup": "playwright_browser_family",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_pw_extract_links": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Playwright browser-session link extraction surface.",
+      "quickProps": [
+        "tool",
+        "playwright",
+        "extract",
+        "browser",
+        "session"
+      ],
+      "rail": "services",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "toolkitBacked": true,
+      "toolFamily": "playwright",
+      "toolFamilyLabel": "Browser interaction family",
+      "providerBacked": false,
+      "sessionBacked": true,
+      "statefulness": "session",
+      "permissionLevel": "read_only",
+      "configRequired": false,
+      "interactionModel": "browser_session_toolkit_member",
+      "graphAbstractionKind": "session_backed_toolkit_member",
+      "compiledGraphRelation": "Compiles to a Playwright browser-session runtime tool that shares page context with other Playwright tools.",
+      "consolidationGroup": "playwright_browser_family",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_pw_get_elements": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Playwright browser-session DOM inspection surface.",
+      "quickProps": [
+        "tool",
+        "playwright",
+        "extract",
+        "browser",
+        "session"
+      ],
+      "rail": "services",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "toolkitBacked": true,
+      "toolFamily": "playwright",
+      "toolFamilyLabel": "Browser interaction family",
+      "providerBacked": false,
+      "sessionBacked": true,
+      "statefulness": "session",
+      "permissionLevel": "read_only",
+      "configRequired": false,
+      "interactionModel": "browser_session_toolkit_member",
+      "graphAbstractionKind": "session_backed_toolkit_member",
+      "compiledGraphRelation": "Compiles to a Playwright browser-session runtime tool that shares page context with other Playwright tools.",
+      "consolidationGroup": "playwright_browser_family",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_playwright_extract_links": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Legacy Playwright browser-session link extraction alias kept for compatibility.",
+      "quickProps": [
+        "tool",
+        "playwright",
+        "extract",
+        "legacy",
+        "browser",
+        "session"
+      ],
+      "rail": "services",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "toolkitBacked": true,
+      "toolFamily": "playwright",
+      "toolFamilyLabel": "Browser interaction family",
+      "providerBacked": false,
+      "sessionBacked": true,
+      "statefulness": "session",
+      "permissionLevel": "read_only",
+      "configRequired": false,
+      "interactionModel": "browser_session_toolkit_member",
+      "graphAbstractionKind": "session_backed_toolkit_member",
+      "compiledGraphRelation": "Compiles to a Playwright browser-session runtime tool that shares page context with other Playwright tools.",
+      "consolidationGroup": "playwright_browser_family",
+      "legacyHelperSurface": true,
+      "preferredSurface": "tool_pw_extract_links",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_playwright_screenshot": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Playwright browser-session screenshot surface.",
+      "quickProps": [
+        "tool",
+        "playwright",
+        "browser",
+        "session"
+      ],
+      "rail": "services",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "toolkitBacked": true,
+      "toolFamily": "playwright",
+      "toolFamilyLabel": "Browser interaction family",
+      "providerBacked": false,
+      "sessionBacked": true,
+      "statefulness": "session",
+      "permissionLevel": "read_only",
+      "configRequired": false,
+      "interactionModel": "browser_session_toolkit_member",
+      "graphAbstractionKind": "session_backed_toolkit_member",
+      "compiledGraphRelation": "Compiles to a Playwright browser-session runtime tool that shares page context with other Playwright tools.",
+      "consolidationGroup": "playwright_browser_family",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "command_node": {
+      "origin": "langgraph",
+      "kind": "primitive",
+      "executionPlacement": "graph",
+      "executionFlavor": "inherit",
+      "summary": "Command-based state update + goto surface. Combines a bounded custom_vars update with direct flow control in one node.",
+      "quickProps": [
+        "command",
+        "goto",
+        "state"
+      ],
+      "rail": "trunk",
+      "surfaceLevel": "stable",
+      "allowedProjectModes": [
+        "langgraph",
+        "langchain",
+        "deepagents"
+      ],
+      "blockFamilyHint": "native",
+      "directCompile": true,
+      "directRun": true,
+      "interactionModel": "state_update_then_goto",
+      "uiAbstractionNotes": [
+        "Combines a bounded state/custom_vars update with a graph goto in one authored step."
+      ],
+      "linkSemantics": [
+        "Direct outgoing edges define the allowed goto targets even though the compiled node returns a Command."
+      ],
+      "graphAbstractionKind": "command_goto_abstraction",
+      "linkMultiplicity": [
+        "One authored node can both mutate state and jump to a target in the same step.",
+        "Direct outgoing edges define allowable goto targets even though the runtime returns a Command rather than following a literal edge callback."
+      ],
+      "compiledGraphRelation": "Compiles to a Command-returning node with explicit allowed ends; one visual node therefore stands for both state mutation and flow redirection.",
+      "uiSemanticHandles": [
+        "state_in",
+        "state_out"
+      ],
+      "debugProjection": [
+        "state and run surfaces should project both the update payload and the goto target when available"
+      ]
+    },
+    "handoff_node": {
+      "origin": "langchain",
+      "kind": "primitive",
+      "executionPlacement": "graph",
+      "executionFlavor": "inherit",
+      "summary": "Bounded state-transfer / handoff surface built on Command semantics. Useful for state-driven agent or step transitions without full subagent indirection.",
+      "quickProps": [
+        "handoff",
+        "command",
+        "state"
+      ],
+      "rail": "composition",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "allowedProjectModes": [
+        "langgraph",
+        "langchain",
+        "deepagents"
+      ],
+      "blockFamilyHint": "structured",
+      "directCompile": true,
+      "directRun": true,
+      "interactionModel": "state_transfer_then_goto",
+      "uiAbstractionNotes": [
+        "Represents a bounded handoff/state-transfer pattern rather than a full autonomous multi-agent runtime."
+      ],
+      "linkSemantics": [
+        "Direct outgoing edges define allowed transfer targets while the node updates handoff state."
+      ],
+      "graphAbstractionKind": "state_transfer_abstraction",
+      "linkMultiplicity": [
+        "One authored node can update handoff state and redirect control in the same step.",
+        "Outgoing direct edges define legal transfer targets even though the runtime returns a Command."
+      ],
+      "compiledGraphRelation": "Compiles to a Command-based state-transfer pattern rather than a fully separate autonomous multi-agent runtime.",
+      "uiSemanticHandles": [
+        "state_in",
+        "state_out"
+      ],
+      "debugProjection": [
+        "debug output should distinguish handoff-state updates from ordinary node output"
+      ]
+    },
+    "store_put": {
+      "origin": "langgraph",
+      "kind": "primitive",
+      "executionPlacement": "memory",
+      "executionFlavor": "inherit",
+      "summary": "Runtime store write surface. Persists one selected state value into the current store namespace as a bounded put operation.",
+      "quickProps": [
+        "store",
+        "write",
+        "memory"
+      ],
+      "rail": "services",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "allowedProjectModes": [
+        "langgraph",
+        "langchain",
+        "deepagents"
+      ],
+      "blockFamilyHint": "structured",
+      "directCompile": true,
+      "directRun": true,
+      "interactionModel": "store_write",
+      "linkSemantics": [
+        "One state input can persist one selected state value into the configured namespace/key."
+      ],
+      "uiAbstractionNotes": [
+        "This is a runtime store side-effect node; the graph edge does not expose the namespace/key mechanics directly."
+      ],
+      "graphAbstractionKind": "bounded_store_side_effect",
+      "compiledGraphRelation": "Compiles to a store.put/aput side effect plus optional receipt output.",
+      "uiSemanticHandles": [
+        "state_in",
+        "state_out"
+      ],
+      "debugProjection": [
+        "run/debug should identify namespace/key receipts distinctly from ordinary state transitions"
+      ],
+      "memorySystemKind": "runtime_store_put",
+      "memoryDurability": "store_runtime_user_selectable_backend",
+      "memoryVisibility": "receipt_plus_meta",
+      "memoryLastEntryKey": "output_key",
+      "memoryBackendSelectable": true,
+      "memoryBackendOptions": [
+        "in_memory",
+        "sqlite_local"
+      ],
+      "toolRuntimeMemoryReady": false,
+      "memoryRole": "store_crud_surface",
+      "memoryAccessModel": "runtime_store_put",
+      "preferredSurface": "store_put",
+      "consolidationGroup": "memory_write_canonical"
+    },
+    "store_search": {
+      "origin": "langgraph",
+      "kind": "primitive",
+      "executionPlacement": "memory",
+      "executionFlavor": "inherit",
+      "summary": "Runtime store search surface. Queries the current store namespace and returns bounded normalized results to the graph state.",
+      "quickProps": [
+        "store",
+        "search",
+        "memory"
+      ],
+      "rail": "services",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "allowedProjectModes": [
+        "langgraph",
+        "langchain",
+        "deepagents"
+      ],
+      "blockFamilyHint": "structured",
+      "directCompile": true,
+      "directRun": true,
+      "interactionModel": "store_search_query",
+      "linkSemantics": [
+        "One state input can drive a bounded store search that writes normalized results back into graph state."
+      ],
+      "uiAbstractionNotes": [
+        "Search feels like a memory/tool lookup in the UI, but it is a runtime store query side effect under the hood."
+      ],
+      "graphAbstractionKind": "bounded_store_query",
+      "compiledGraphRelation": "Compiles to a store.search/asearch call against one namespace derived from params/runtime context.",
+      "uiSemanticHandles": [
+        "state_in",
+        "data_out"
+      ],
+      "debugProjection": [
+        "search results should be surfaced as normalized state outputs, not opaque store internals"
+      ],
+      "memorySystemKind": "runtime_store_search",
+      "memoryDurability": "store_runtime_user_selectable_backend",
+      "memoryVisibility": "normalized_search_results",
+      "memoryLastEntryKey": "output_key",
+      "memoryBackendSelectable": true,
+      "memoryBackendOptions": [
+        "in_memory",
+        "sqlite_local"
+      ],
+      "toolRuntimeMemoryReady": false,
+      "memoryRole": "store_crud_surface",
+      "memoryAccessModel": "runtime_store_search",
+      "preferredSurface": "memory_access",
+      "consolidationGroup": "memory_access_legacy"
+    },
+    "send_fanout": {
+      "origin": "langgraph",
+      "kind": "composite",
+      "executionPlacement": "graph",
+      "executionFlavor": "async",
+      "summary": "Bounded Send API fanout surface. Dispatches one worker payload per source item into a single worker target while keeping the orchestration graph explicit.",
+      "quickProps": [
+        "send",
+        "fanout",
+        "workers"
+      ],
+      "rail": "composition",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "allowedProjectModes": [
+        "langgraph",
+        "langchain",
+        "deepagents"
+      ],
+      "blockFamilyHint": "structured",
+      "directCompile": true,
+      "directRun": true,
+      "interactionModel": "dispatch_fanout",
+      "uiAbstractionNotes": [
+        "This node is a graphical dispatch abstraction over LangGraph Send worker creation.",
+        "A single outgoing worker edge in the editor can fan out to many worker payloads at runtime."
+      ],
+      "linkSemantics": [
+        "One visual edge can represent N worker dispatches.",
+        "The compiled graph uses conditional dispatch plus shared-state reduction rather than literal duplicated edges."
+      ],
+      "graphAbstractionKind": "one_to_many_runtime_dispatch",
+      "linkMultiplicity": [
+        "A single outgoing worker edge can dispatch many runtime workers.",
+        "One source item list can therefore expand into N runtime worker invocations while remaining one authored edge."
+      ],
+      "compiledGraphRelation": "Compiles to conditional Send dispatch plus worker-state projection; the canvas intentionally compresses many runtime branches into one worker edge.",
+      "uiSemanticHandles": [
+        "state_in",
+        "worker_out",
+        "state_out"
+      ],
+      "debugProjection": [
+        "fanout worker context is projected into run/debug/state surfaces via fanout_meta",
+        "the host graph does not draw one literal edge per runtime worker"
+      ]
+    },
+    "store_get": {
+      "origin": "langgraph",
+      "kind": "primitive",
+      "executionPlacement": "memory",
+      "executionFlavor": "inherit",
+      "summary": "Runtime store read-by-key surface. Retrieves one specific item from the current namespace and normalizes it into graph state.",
+      "quickProps": [
+        "store",
+        "get",
+        "memory"
+      ],
+      "rail": "services",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "allowedProjectModes": [
+        "langgraph",
+        "langchain",
+        "deepagents"
+      ],
+      "blockFamilyHint": "structured",
+      "directCompile": true,
+      "directRun": true,
+      "interactionModel": "store_get_query",
+      "linkSemantics": [
+        "One state input can fetch one specific store item by namespace/key."
+      ],
+      "uiAbstractionNotes": [
+        "The node looks simple on the canvas even though namespace/key resolution happens in runtime logic."
+      ],
+      "graphAbstractionKind": "bounded_store_query",
+      "compiledGraphRelation": "Compiles to a store.get/aget call against one resolved namespace/key.",
+      "uiSemanticHandles": [
+        "state_in",
+        "data_out"
+      ],
+      "debugProjection": [
+        "debug/state should expose the returned item as normalized graph data rather than raw store objects"
+      ],
+      "memorySystemKind": "runtime_store_get",
+      "memoryDurability": "store_runtime_user_selectable_backend",
+      "memoryVisibility": "normalized_store_item",
+      "memoryLastEntryKey": "output_key",
+      "memoryBackendSelectable": true,
+      "memoryBackendOptions": [
+        "in_memory",
+        "sqlite_local"
+      ],
+      "toolRuntimeMemoryReady": false,
+      "memoryRole": "store_crud_surface",
+      "memoryAccessModel": "runtime_store_get",
+      "preferredSurface": "memory_access",
+      "consolidationGroup": "memory_access_legacy"
+    },
+    "store_delete": {
+      "origin": "langgraph",
+      "kind": "primitive",
+      "executionPlacement": "memory",
+      "executionFlavor": "inherit",
+      "summary": "Runtime store delete surface. Removes one item from the current namespace and optionally emits a bounded receipt.",
+      "quickProps": [
+        "store",
+        "delete",
+        "memory"
+      ],
+      "rail": "services",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "allowedProjectModes": [
+        "langgraph",
+        "langchain",
+        "deepagents"
+      ],
+      "blockFamilyHint": "structured",
+      "directCompile": true,
+      "directRun": true,
+      "interactionModel": "store_delete_side_effect",
+      "linkSemantics": [
+        "One state input can delete one specific store item and optionally emit a receipt."
+      ],
+      "uiAbstractionNotes": [
+        "Deletion is a side effect on the runtime store; the canvas intentionally keeps that operation compact."
+      ],
+      "graphAbstractionKind": "bounded_store_side_effect",
+      "compiledGraphRelation": "Compiles to a store.delete/adelete call plus optional normalized receipt payload.",
+      "uiSemanticHandles": [
+        "state_in",
+        "state_out"
+      ],
+      "debugProjection": [
+        "debug/state should identify delete receipts separately from ordinary graph outputs"
+      ],
+      "memorySystemKind": "runtime_store_delete",
+      "memoryDurability": "store_runtime_user_selectable_backend",
+      "memoryVisibility": "delete_receipt",
+      "memoryLastEntryKey": "output_key",
+      "memoryBackendSelectable": true,
+      "memoryBackendOptions": [
+        "in_memory",
+        "sqlite_local"
+      ],
+      "toolRuntimeMemoryReady": false,
+      "memoryRole": "store_crud_surface",
+      "memoryAccessModel": "runtime_store_delete"
+    },
+    "reduce_join": {
+      "origin": "langgraph",
+      "kind": "composite",
+      "executionPlacement": "graph",
+      "executionFlavor": "async",
+      "summary": "Bounded reduce/join surface paired with Send API fanout. It summarizes an already-reduced shared state key instead of pretending to be a generic distributed reducer.",
+      "quickProps": [
+        "reduce",
+        "join",
+        "fanout"
+      ],
+      "rail": "composition",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "allowedProjectModes": [
+        "langgraph",
+        "langchain",
+        "deepagents"
+      ],
+      "blockFamilyHint": "structured",
+      "directCompile": true,
+      "directRun": true,
+      "interactionModel": "worker_reduce_join",
+      "linkSemantics": [
+        "Usually receives one or more worker outputs after a send_fanout dispatch.",
+        "Reduces a shared state key rather than mirroring every worker edge literally in the compiled graph."
+      ],
+      "uiAbstractionNotes": [
+        "This block is a graphical abstraction over worker-result accumulation plus a final reduction step.",
+        "The compiled graph may execute the reduce node multiple times as worker results accumulate; the final state reflects the last reduced value."
+      ],
+      "graphAbstractionKind": "many_to_one_runtime_reduction",
+      "linkMultiplicity": [
+        "One visual inbound path can stand for many worker completions over time.",
+        "The reduce node summarizes a shared result key instead of requiring one literal join edge per worker."
+      ],
+      "compiledGraphRelation": "Compiled/runtime behavior reduces shared worker outputs as they accumulate; the authored join node is intentionally simpler than the runtime fanout history.",
+      "uiSemanticHandles": [
+        "state_in",
+        "state_out"
+      ],
+      "debugProjection": [
+        "run/debug/state should show the shared results/progress key rather than pretending every worker path is explicitly drawn"
+      ]
+    },
+    "memory_access": {
+      "origin": "shared",
+      "kind": "composite",
+      "executionPlacement": "memory",
+      "summary": "Canonical bounded memory access surface for agents/tools. Use this when you want one explicit memory payload output without choosing early between profile lookup, store get, or store search helper variants.",
+      "quickProps": [
+        "memory",
+        "access",
+        "canonical"
+      ],
+      "interactionModel": "bounded_memory_access_surface",
+      "linkSemantics": [
+        "One state input can resolve into one bounded memory payload output using profile lookup, store get, or store search semantics.",
+        "The visual node hides store/profile plumbing behind one canonical memory surface for downstream agent/tool consumption."
+      ],
+      "uiAbstractionNotes": [
+        "This is the preferred explicit memory access node for feeding memory payloads into agents or tools via graph handles.",
+        "Legacy helper nodes remain available, but this surface is the clearest bounded choice in the current build."
+      ],
+      "graphAbstractionKind": "canonical_memory_access_abstraction",
+      "compiledGraphRelation": "Compiles to a bounded runtime-store profile/get/search lookup depending on access_mode, normalized into one memory payload output.",
+      "uiSemanticHandles": [
+        "state_in",
+        "memory_out"
+      ],
+      "debugProjection": [
+        "debug/state should identify access_mode, namespace, output_key and backend",
+        "downstream consumers should treat the output as a normalized memory payload rather than raw store internals"
+      ],
+      "memorySystemKind": "runtime_memory_access_surface",
+      "memoryDurability": "store_runtime_user_selectable_backend",
+      "memoryVisibility": "normalized_memory_payload",
+      "memoryLastEntryKey": "output_key",
+      "memoryBackendSelectable": true,
+      "memoryBackendOptions": [
+        "in_memory",
+        "sqlite_local"
+      ],
+      "toolRuntimeMemoryReady": true,
+      "toolRuntimeMemoryAccessMode": "bounded_graph_surface_for_agent_or_tool_memory_payload",
+      "memoryRole": "canonical_memory_access_surface",
+      "memoryAccessModel": "runtime_store_profile_get_or_search_projection",
+      "preferredSurface": true,
+      "consolidates": [
+        "memory_store_read",
+        "memoryreader",
+        "store_get",
+        "store_search"
+      ]
+    },
+    "subgraph_node": {
+      "origin": "langgraph",
+      "kind": "composite",
+      "executionPlacement": "subgraph",
+      "summary": "Child subgraph surface or saved subgraph reference. Distinct from LangChain-derived subagents and used for graph-native child editing/composition.",
+      "quickProps": [
+        "wrapper",
+        "subgraph",
+        "child-editor"
+      ],
+      "autoLinkTargets": [
+        "tools_in"
+      ],
+      "naturalArtifactTypes": [
+        "graph",
+        "subgraph"
+      ],
+      "naturalProfiles": [
+        "langgraph_async",
+        "langgraph_sync"
+      ],
+      "paletteHidden": false,
+      "rail": "composition",
+      "surfaceLevel": "stable",
+      "wrapperBacked": true,
+      "trunkDependent": true,
+      "directCompile": true,
+      "directRun": true,
+      "interactionModel": "child_subgraph_or_saved_subgraph_reference",
+      "uiAbstractionNotes": [
+        "This block is the graph-native child/subgraph surface. It represents either an editable child subgraph tab or a saved subgraph reference.",
+        "Use this instead of sub_agent when the intent is graph composition rather than a LangChain-derived agent artifact."
+      ],
+      "linkSemantics": [
+        "One visual node can stand for an editable child subgraph or a saved subgraph artifact reference.",
+        "Its direct edges are authored as ordinary graph links even when the compiled/runtime target is a nested graph."
+      ],
+      "graphAbstractionKind": "child_subgraph_reference",
+      "linkMultiplicity": [
+        "The canvas node represents one child graph reference, not every internal node of that child graph.",
+        "Its direct edges remain ordinary authoring links while the compiled graph invokes a nested graph."
+      ],
+      "compiledGraphRelation": "Compiles to a nested graph/subgraph call on the trunk. The child editor tab is a product abstraction, not a second public runtime.",
+      "uiSemanticHandles": [
+        "messages_in",
+        "messages_out",
+        "memory_in"
+      ],
+      "debugProjection": [
+        "runtime/debug surfaces should identify the child graph or saved subgraph source",
+        "reopen flow points to the child subgraph editor or saved subgraph artifact"
+      ],
+      "memorySystemKind": "memory_input_consumer",
+      "memoryDurability": "depends_on_child_subgraph_or_saved_subgraph",
+      "memoryVisibility": "consumes_memory_input_handle",
+      "memoryConsumer": true,
+      "toolRuntimeMemoryAccessMode": "memory_input_handle_only_in_current_build",
+      "memoryRole": "child_subgraph_memory_consumer",
+      "memoryAccessModel": "graph_memory_input_payload_forwarded_to_child_subgraph",
+      "compileAliasType": "sub_agent",
+      "compileStrategy": "alias"
+    },
+    "runtime_context_read": {
+      "origin": "langgraph",
+      "kind": "runtime_context",
+      "executionPlacement": "node",
+      "executionFlavor": "graph-native",
+      "summary": "Reads static runtime context passed at invoke/stream time and projects it into graph state.",
+      "quickProps": [
+        "context",
+        "runtime",
+        "read"
+      ],
+      "naturalArtifactTypes": [
+        "graph",
+        "subgraph"
+      ],
+      "naturalProfiles": [
+        "langgraph_sync",
+        "langgraph_async"
+      ],
+      "fauxNode": false,
+      "paletteHidden": false,
+      "futureHook": false,
+      "internalOnly": false,
+      "rail": "context",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "wrapperBacked": false,
+      "trunkDependent": true,
+      "directCompile": true,
+      "directRun": true,
+      "interactionModel": "runtime_context_projection",
+      "uiAbstractionNotes": [
+        "Reads static runtime context, not mutable graph state. Use runtime settings to provide values at run time."
+      ],
+      "graphAbstractionKind": "runtime_context_reader",
+      "compiledGraphRelation": "Compiles to a graph-native node that reads Runtime.context and emits a value or payload into state.",
+      "uiSemanticHandles": [
+        "data_out"
+      ],
+      "debugProjection": [
+        "runtime/debug surfaces should show context reads separately from state updates"
+      ],
+      "preferredSurface": true,
+      "blockFamilyHint": "structured"
+    },
+    "structured_output_extract": {
+      "origin": "langchain",
+      "kind": "transform",
+      "executionPlacement": "node",
+      "executionFlavor": "graph-native",
+      "summary": "Extracts one field or the full payload from a structured output object already present in state/custom_vars.",
+      "quickProps": [
+        "structured",
+        "extract",
+        "json"
+      ],
+      "naturalArtifactTypes": [
+        "graph",
+        "subgraph"
+      ],
+      "naturalProfiles": [
+        "langgraph_sync",
+        "langgraph_async"
+      ],
+      "fauxNode": false,
+      "paletteHidden": false,
+      "futureHook": false,
+      "internalOnly": false,
+      "rail": "logic",
+      "surfaceLevel": "stable",
+      "advancedVisible": true,
+      "wrapperBacked": false,
+      "trunkDependent": true,
+      "directCompile": true,
+      "directRun": true,
+      "interactionModel": "structured_output_postprocess",
+      "uiAbstractionNotes": [
+        "Use after an LLM/agent configured with structured output to project specific fields into simpler graph keys."
+      ],
+      "graphAbstractionKind": "structured_output_extractor",
+      "compiledGraphRelation": "Compiles to a graph-native node that reads structured output from state/custom_vars and emits an extracted value.",
+      "uiSemanticHandles": [
+        "data_in",
+        "data_out"
+      ],
+      "debugProjection": [
+        "runtime/debug surfaces should show source structured key and extracted field"
+      ],
+      "preferredSurface": true,
+      "blockFamilyHint": "structured"
+    },
+    "structured_output_router": {
+      "origin": "langchain",
+      "kind": "router",
+      "executionPlacement": "node",
+      "executionFlavor": "graph-native",
+      "summary": "Routes execution based on a field inside a structured output payload.",
+      "quickProps": [
+        "structured",
+        "route"
+      ],
+      "naturalArtifactTypes": [
+        "graph",
+        "subgraph"
+      ],
+      "naturalProfiles": [
+        "langgraph_sync",
+        "langgraph_async"
+      ],
+      "fauxNode": false,
+      "paletteHidden": false,
+      "futureHook": false,
+      "internalOnly": false,
+      "rail": "logic",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "wrapperBacked": false,
+      "trunkDependent": true,
+      "directCompile": true,
+      "directRun": true,
+      "interactionModel": "structured_output_conditional_routing",
+      "uiAbstractionNotes": [
+        "Acts like a logic router but reads a field from structured output rather than free-form text/JSON."
+      ],
+      "graphAbstractionKind": "structured_output_router",
+      "compiledGraphRelation": "Compiles to a conditional router function over a structured output field.",
+      "uiSemanticHandles": [
+        "data_in",
+        "continue"
+      ],
+      "debugProjection": [
+        "runtime/debug surfaces should identify the structured field used for routing"
+      ],
+      "preferredSurface": true,
+      "blockFamilyHint": "structured"
+    },
+    "tool_tavily_extract": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Tavily provider-backed URL extraction tool surface.",
+      "quickProps": [
+        "tool",
+        "tavily",
+        "extract",
+        "config"
+      ],
+      "rail": "services",
+      "surfaceLevel": "stable",
+      "providerBacked": true,
+      "providerKind": "tavily",
+      "providerLabel": "Tavily",
+      "toolFamily": "tavily",
+      "toolFamilyLabel": "Tavily tools",
+      "toolkitBacked": false,
+      "sessionBacked": false,
+      "statefulness": "stateless",
+      "permissionLevel": "read_only",
+      "configRequired": true,
+      "interactionModel": "provider_backed_url_extraction",
+      "graphAbstractionKind": "single_tool_surface",
+      "compiledGraphRelation": "Compiles to the Tavily-backed tavily_extract runtime tool.",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_sql_list_tables": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "SQL inspection surface for listing tables.",
+      "quickProps": [
+        "tool",
+        "sql",
+        "inspect"
+      ],
+      "rail": "services",
+      "surfaceLevel": "stable",
+      "toolkitBacked": true,
+      "toolFamily": "sql",
+      "toolFamilyLabel": "SQL toolkit",
+      "providerBacked": false,
+      "sessionBacked": false,
+      "statefulness": "stateless",
+      "permissionLevel": "read_only",
+      "configRequired": true,
+      "interactionModel": "database_toolkit_member",
+      "graphAbstractionKind": "toolkit_member_surface",
+      "compiledGraphRelation": "Compiles to the sql_list_tables runtime tool.",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_sql_get_schema": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "SQL inspection surface for reading table schema.",
+      "quickProps": [
+        "tool",
+        "sql",
+        "schema"
+      ],
+      "rail": "services",
+      "surfaceLevel": "stable",
+      "toolkitBacked": true,
+      "toolFamily": "sql",
+      "toolFamilyLabel": "SQL toolkit",
+      "providerBacked": false,
+      "sessionBacked": false,
+      "statefulness": "stateless",
+      "permissionLevel": "read_only",
+      "configRequired": true,
+      "interactionModel": "database_toolkit_member",
+      "graphAbstractionKind": "toolkit_member_surface",
+      "compiledGraphRelation": "Compiles to the sql_get_schema runtime tool.",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_sql_query_check": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "SQL validation surface for checking read-only queries before execution.",
+      "quickProps": [
+        "tool",
+        "sql",
+        "validate"
+      ],
+      "rail": "services",
+      "surfaceLevel": "stable",
+      "toolkitBacked": true,
+      "toolFamily": "sql",
+      "toolFamilyLabel": "SQL toolkit",
+      "providerBacked": false,
+      "sessionBacked": false,
+      "statefulness": "stateless",
+      "permissionLevel": "read_only",
+      "configRequired": true,
+      "interactionModel": "database_toolkit_member",
+      "graphAbstractionKind": "toolkit_member_surface",
+      "compiledGraphRelation": "Compiles to the sql_query_check runtime tool.",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_github_get_issue": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "GitHub provider-backed read surface for one issue.",
+      "quickProps": [
+        "tool",
+        "github",
+        "read",
+        "config"
+      ],
+      "rail": "services",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "providerBacked": true,
+      "providerKind": "github",
+      "providerLabel": "GitHub",
+      "toolkitBacked": true,
+      "toolFamily": "github",
+      "toolFamilyLabel": "GitHub toolkit",
+      "sessionBacked": false,
+      "statefulness": "stateless",
+      "permissionLevel": "read_only",
+      "configRequired": true,
+      "interactionModel": "provider_backed_repository_read",
+      "graphAbstractionKind": "toolkit_member_surface",
+      "compiledGraphRelation": "Compiles to the github_get_issue runtime tool.",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_github_get_pull_request": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "GitHub provider-backed read surface for one pull request.",
+      "quickProps": [
+        "tool",
+        "github",
+        "read",
+        "config"
+      ],
+      "rail": "services",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "providerBacked": true,
+      "providerKind": "github",
+      "providerLabel": "GitHub",
+      "toolkitBacked": true,
+      "toolFamily": "github",
+      "toolFamilyLabel": "GitHub toolkit",
+      "sessionBacked": false,
+      "statefulness": "stateless",
+      "permissionLevel": "read_only",
+      "configRequired": true,
+      "interactionModel": "provider_backed_repository_read",
+      "graphAbstractionKind": "toolkit_member_surface",
+      "compiledGraphRelation": "Compiles to the github_get_pull_request runtime tool.",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_github_read_file": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "GitHub provider-backed read surface for repository files.",
+      "quickProps": [
+        "tool",
+        "github",
+        "read",
+        "config"
+      ],
+      "rail": "services",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "providerBacked": true,
+      "providerKind": "github",
+      "providerLabel": "GitHub",
+      "toolkitBacked": true,
+      "toolFamily": "github",
+      "toolFamilyLabel": "GitHub toolkit",
+      "sessionBacked": false,
+      "statefulness": "stateless",
+      "permissionLevel": "read_only",
+      "configRequired": true,
+      "interactionModel": "provider_backed_repository_read",
+      "graphAbstractionKind": "toolkit_member_surface",
+      "compiledGraphRelation": "Compiles to the github_read_file runtime tool.",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_github_search_issues_prs": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "GitHub provider-backed read surface for issues and pull requests search.",
+      "quickProps": [
+        "tool",
+        "github",
+        "read",
+        "config"
+      ],
+      "rail": "services",
+      "surfaceLevel": "advanced",
+      "advancedVisible": true,
+      "providerBacked": true,
+      "providerKind": "github",
+      "providerLabel": "GitHub",
+      "toolkitBacked": true,
+      "toolFamily": "github",
+      "toolFamilyLabel": "GitHub toolkit",
+      "sessionBacked": false,
+      "statefulness": "stateless",
+      "permissionLevel": "read_only",
+      "configRequired": true,
+      "interactionModel": "provider_backed_repository_read",
+      "graphAbstractionKind": "toolkit_member_surface",
+      "compiledGraphRelation": "Compiles to the github_search_issues_prs runtime tool.",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_brave_search": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Brave provider-backed search tool surface.",
+      "quickProps": [
+        "tool",
+        "brave",
+        "search",
+        "config"
+      ],
+      "rail": "services",
+      "surfaceLevel": "stable",
+      "providerBacked": true,
+      "providerKind": "brave",
+      "providerLabel": "Brave Search",
+      "toolkitBacked": false,
+      "toolFamily": "brave",
+      "toolFamilyLabel": "Brave Search",
+      "sessionBacked": false,
+      "statefulness": "stateless",
+      "permissionLevel": "read_only",
+      "configRequired": true,
+      "interactionModel": "provider_backed_search",
+      "graphAbstractionKind": "single_tool_surface",
+      "compiledGraphRelation": "Compiles to the Brave-backed brave_search runtime tool.",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_duckduckgo_search": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "DuckDuckGo search tool surface backed by the duckduckgo-search package.",
+      "quickProps": [
+        "tool",
+        "duckduckgo",
+        "search",
+        "free"
+      ],
+      "rail": "services",
+      "surfaceLevel": "stable",
+      "providerBacked": true,
+      "providerKind": "duckduckgo",
+      "providerLabel": "DuckDuckGo",
+      "toolkitBacked": false,
+      "toolFamily": "duckduckgo",
+      "toolFamilyLabel": "DuckDuckGo Search",
+      "sessionBacked": false,
+      "statefulness": "stateless",
+      "permissionLevel": "read_only",
+      "configRequired": false,
+      "interactionModel": "provider_backed_search",
+      "graphAbstractionKind": "single_tool_surface",
+      "compiledGraphRelation": "Compiles to the duckduckgo_search runtime tool.",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_requests_get": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Requests toolkit GET surface for stateless HTTP reads.",
+      "quickProps": [
+        "tool",
+        "requests",
+        "http",
+        "get"
+      ],
+      "rail": "services",
+      "surfaceLevel": "stable",
+      "providerBacked": false,
+      "toolkitBacked": true,
+      "toolFamily": "requests",
+      "toolFamilyLabel": "Requests toolkit",
+      "sessionBacked": false,
+      "statefulness": "stateless",
+      "permissionLevel": "read_only",
+      "configRequired": true,
+      "interactionModel": "stateless_http_toolkit_member",
+      "graphAbstractionKind": "toolkit_member_surface",
+      "compiledGraphRelation": "Compiles to the requests_get runtime tool with author-configured HTTP scope.",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_requests_post": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Requests toolkit POST surface for stateless HTTP writes or RPC-style calls.",
+      "quickProps": [
+        "tool",
+        "requests",
+        "http",
+        "post"
+      ],
+      "rail": "services",
+      "surfaceLevel": "stable",
+      "providerBacked": false,
+      "toolkitBacked": true,
+      "toolFamily": "requests",
+      "toolFamilyLabel": "Requests toolkit",
+      "sessionBacked": false,
+      "statefulness": "stateless",
+      "permissionLevel": "mutating",
+      "configRequired": true,
+      "interactionModel": "stateless_http_toolkit_member",
+      "graphAbstractionKind": "toolkit_member_surface",
+      "compiledGraphRelation": "Compiles to the requests_post runtime tool with author-configured HTTP scope.",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_fs_list_dir": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Read-only local filesystem listing from a bounded root path.",
+      "quickProps": [
+        "tool",
+        "filesystem",
+        "local",
+        "read-only"
+      ],
+      "rail": "services",
+      "surfaceLevel": "stable",
+      "providerBacked": false,
+      "toolkitBacked": true,
+      "toolFamily": "filesystem",
+      "toolFamilyLabel": "Filesystem toolkit",
+      "sessionBacked": false,
+      "statefulness": "stateless",
+      "permissionLevel": "read_only",
+      "configRequired": false,
+      "interactionModel": "local_filesystem_toolkit_member",
+      "graphAbstractionKind": "environment_backed_toolkit_member",
+      "compiledGraphRelation": "Compiles to the fs_list_dir runtime tool with a bounded local root path.",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_fs_read_file": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Read one local text file from a bounded root path.",
+      "quickProps": [
+        "tool",
+        "filesystem",
+        "file",
+        "read-only"
+      ],
+      "rail": "services",
+      "surfaceLevel": "stable",
+      "providerBacked": false,
+      "toolkitBacked": true,
+      "toolFamily": "filesystem",
+      "toolFamilyLabel": "Filesystem toolkit",
+      "sessionBacked": false,
+      "statefulness": "stateless",
+      "permissionLevel": "read_only",
+      "configRequired": false,
+      "interactionModel": "local_filesystem_toolkit_member",
+      "graphAbstractionKind": "environment_backed_toolkit_member",
+      "compiledGraphRelation": "Compiles to the fs_read_file runtime tool with bounded local file access.",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_fs_glob": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Read-only glob search across a bounded local filesystem root.",
+      "quickProps": [
+        "tool",
+        "filesystem",
+        "glob",
+        "read-only"
+      ],
+      "rail": "services",
+      "surfaceLevel": "stable",
+      "providerBacked": false,
+      "toolkitBacked": true,
+      "toolFamily": "filesystem",
+      "toolFamilyLabel": "Filesystem toolkit",
+      "sessionBacked": false,
+      "statefulness": "stateless",
+      "permissionLevel": "read_only",
+      "configRequired": false,
+      "interactionModel": "local_filesystem_toolkit_member",
+      "graphAbstractionKind": "environment_backed_toolkit_member",
+      "compiledGraphRelation": "Compiles to the fs_glob runtime tool with bounded local root search.",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_fs_grep": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Read-only grep-style text search across a bounded local filesystem root.",
+      "quickProps": [
+        "tool",
+        "filesystem",
+        "grep",
+        "read-only"
+      ],
+      "rail": "services",
+      "surfaceLevel": "stable",
+      "providerBacked": false,
+      "toolkitBacked": true,
+      "toolFamily": "filesystem",
+      "toolFamilyLabel": "Filesystem toolkit",
+      "sessionBacked": false,
+      "statefulness": "stateless",
+      "permissionLevel": "read_only",
+      "configRequired": false,
+      "interactionModel": "local_filesystem_toolkit_member",
+      "graphAbstractionKind": "environment_backed_toolkit_member",
+      "compiledGraphRelation": "Compiles to the fs_grep runtime tool with bounded local root text search.",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload"
+    },
+    "tool_fs_write_file": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Preview or apply one local text-file write under a bounded root path with explicit create-vs-overwrite and size guards.",
+      "quickProps": [
+        "tool",
+        "filesystem",
+        "preview+apply",
+        "mutating"
+      ],
+      "rail": "services",
+      "surfaceLevel": "stable",
+      "providerBacked": false,
+      "toolkitBacked": true,
+      "toolFamily": "filesystem",
+      "toolFamilyLabel": "Filesystem toolkit",
+      "sessionBacked": false,
+      "statefulness": "stateless",
+      "permissionLevel": "mutating",
+      "configRequired": false,
+      "interactionModel": "local_filesystem_toolkit_member",
+      "graphAbstractionKind": "environment_backed_toolkit_member",
+      "compiledGraphRelation": "Compiles to the fs_write_file runtime tool with explicit mode='preview'|'apply'; preview reports create-vs-overwrite without mutating, and apply performs the bounded local write.",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload",
+      "debugProjection": [
+        "During runs, graph and logs should distinguish preview from apply. Preview is advisory and must not mutate the filesystem.",
+        "Run/debug surfaces should expose create-vs-overwrite, bounded target path, and explicit blocked reasons such as root escape or overwrite denial.",
+        "A node may look identical on the authored graph while the run history records whether the last execution was preview, applied, blocked, or failed."
+      ],
+      "uiAbstractionNotes": [
+        "One authored tool node represents a bounded local write capability; the mutation only happens when the tool is invoked in apply mode."
+      ],
+      "linkSemantics": [
+        "Links expose the write capability to the receiving step; they do not imply that a file will be mutated on every run."
+      ]
+    },
+    "tool_fs_edit_file": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Preview or apply one local text-file edit under a bounded root path with explicit match-count and size guards.",
+      "quickProps": [
+        "tool",
+        "filesystem",
+        "preview+apply",
+        "mutating"
+      ],
+      "rail": "services",
+      "surfaceLevel": "stable",
+      "providerBacked": false,
+      "toolkitBacked": true,
+      "toolFamily": "filesystem",
+      "toolFamilyLabel": "Filesystem toolkit",
+      "sessionBacked": false,
+      "statefulness": "stateless",
+      "permissionLevel": "mutating",
+      "configRequired": false,
+      "interactionModel": "local_filesystem_toolkit_member",
+      "graphAbstractionKind": "environment_backed_toolkit_member",
+      "compiledGraphRelation": "Compiles to the fs_edit_file runtime tool with explicit mode='preview'|'apply'; preview reports match counts without mutating, and apply performs the bounded local edit.",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload",
+      "debugProjection": [
+        "During runs, graph and logs should distinguish preview from apply. Preview reports match counts and replacement intent without mutating.",
+        "Run/debug surfaces should expose the bounded target path, match count when known, replace-all intent, and explicit blocked reasons such as missing target or no match.",
+        "A node may look identical on the authored graph while the run history records whether the last execution was preview, applied, blocked, or failed."
+      ],
+      "uiAbstractionNotes": [
+        "One authored tool node represents a bounded local edit capability; the edit only happens when the tool is invoked in apply mode."
+      ],
+      "linkSemantics": [
+        "Links expose the edit capability to the receiving step; they do not imply that text replacement will occur on every run."
+      ]
+    },
+    "tool_shell_command": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "User-armed bounded local shell subprocess surface with cwd and command allowlist guards. Returns explicit blocked/failed/succeeded statuses. Not OS-container isolated.",
+      "quickProps": [
+        "tool",
+        "shell",
+        "local",
+        "user-armed"
+      ],
+      "rail": "services",
+      "surfaceLevel": "advanced",
+      "providerBacked": false,
+      "toolkitBacked": true,
+      "toolFamily": "shell",
+      "toolFamilyLabel": "Shell toolkit",
+      "sessionBacked": false,
+      "statefulness": "stateless",
+      "permissionLevel": "mutating",
+      "configRequired": true,
+      "interactionModel": "user_armed_local_subprocess",
+      "graphAbstractionKind": "environment_backed_toolkit_member",
+      "compiledGraphRelation": "Compiles to the shell_command runtime tool and stays blocked unless the graph runtime shell toggle is armed.",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload",
+      "debugProjection": [
+        "Run/debug surfaces should expose whether shell was blocked because the runtime toggle was off, the cwd was invalid, or the command was outside the allowlist.",
+        "This surface is user-armed and root-bounded, not sandboxed. The graph should not imply isolated execution or dry-run support.",
+        "A node may look identical on the authored graph while the run history records blocked, failed, or succeeded shell execution."
+      ],
+      "uiAbstractionNotes": [
+        "One authored tool node represents bounded shell capability gated by runtime settings and command allowlists."
+      ],
+      "linkSemantics": [
+        "Links expose shell capability to the receiving step; they do not imply that shell execution is armed for the current run."
+      ]
+    },
+    "tool_fs_apply_patch": {
+      "origin": "shared",
+      "kind": "primitive",
+      "executionPlacement": "tool",
+      "executionFlavor": "tool-call",
+      "summary": "Preview or apply a bounded unified diff patch under a local root path with explicit touched-file, creation, rejection, and size guards.",
+      "quickProps": [
+        "tool",
+        "filesystem",
+        "preview+apply",
+        "patch"
+      ],
+      "rail": "services",
+      "surfaceLevel": "advanced",
+      "providerBacked": false,
+      "toolkitBacked": true,
+      "toolFamily": "filesystem",
+      "toolFamilyLabel": "Filesystem toolkit",
+      "sessionBacked": false,
+      "statefulness": "stateless",
+      "permissionLevel": "mutating",
+      "configRequired": false,
+      "interactionModel": "local_filesystem_toolkit_member",
+      "graphAbstractionKind": "environment_backed_toolkit_member",
+      "compiledGraphRelation": "Compiles to the fs_apply_patch runtime tool with explicit mode='preview'|'apply'; preview parses and validates touched files without mutating, and apply writes only when the bounded patch plan is not blocked.",
+      "toolProvisioningModel": "tool_surface",
+      "toolSelectionAuthority": "not_applicable",
+      "toolAccessScope": "single_tool_surface",
+      "toolResultModel": "returned_tool_payload",
+      "debugProjection": [
+        "During runs, graph and logs should distinguish preview from apply. Preview parses and validates a bounded patch plan without mutating.",
+        "Run/debug surfaces should expose files to modify, files to create, files rejected, and explicit blocked reasons such as invalid patch or root escape.",
+        "Apply may still be non-atomic across multiple files; the runtime should report applied, blocked, failed, or partially applied truthfully rather than implying full atomicity."
+      ],
+      "uiAbstractionNotes": [
+        "One authored tool node represents a bounded local patch capability; the graph stays compact even when one patch touches several files."
+      ],
+      "linkSemantics": [
+        "Links expose the patch capability to the receiving step; they do not imply that every touched file is already accepted or writable."
+      ]
+    }
+  },
+  "rails": {
+    "trunk": {
+      "label": "Rail 0 · Proven trunk",
+      "description": "Stable LangGraph-centered graph/subgraph compile-run path."
+    },
+    "composition": {
+      "label": "Rail 1 · Structural composition",
+      "description": "Subgraphs, wrappers, references, imported graph-like units, and reusable composition surfaces."
+    },
+    "agentic": {
+      "label": "Rail 2 · Agentic / assistant",
+      "description": "Agent-flavored shells that still depend on the trunk but now have explicit bounded meaning."
+    },
+    "adapter": {
+      "label": "Rail 3 · Adapter / future-runtime",
+      "description": "Adapter-backed or alias-backed surfaces that are broader than the trunk but not equal to it."
+    },
+    "services": {
+      "label": "Rail 4 · Platform services",
+      "description": "Artifact library, capability matrix, packaging, validation, and coordination services."
+    }
+  },
+  "modeContracts": {
+    "langgraph": {
+      "label": "LangGraph contract",
+      "allowedArtifactKinds": [
+        "graph",
+        "subgraph"
+      ],
+      "allowedExecutionProfiles": [
+        "langgraph_sync",
+        "langgraph_async"
+      ],
+      "compileEnabled": true,
+      "runtimeEnabled": true,
+      "defaultLibraryKinds": [
+        "graph",
+        "subgraph"
+      ],
+      "advancedLibraryKinds": [
+        "graph",
+        "subgraph",
+        "agent",
+        "deep_agent"
+      ],
+      "bridgeTargets": [
+        "langgraph"
+      ],
+      "editorOnly": false
+    },
+    "langchain": {
+      "label": "LangChain contract",
+      "allowedArtifactKinds": [
+        "agent"
+      ],
+      "allowedExecutionProfiles": [
+        "langchain_agent"
+      ],
+      "compileEnabled": true,
+      "runtimeEnabled": false,
+      "defaultLibraryKinds": [
+        "agent"
+      ],
+      "advancedLibraryKinds": [
+        "agent"
+      ],
+      "bridgeTargets": [
+        "langgraph"
+      ],
+      "editorOnly": true
+    },
+    "deepagents": {
+      "label": "DeepAgents contract",
+      "allowedArtifactKinds": [
+        "deep_agent"
+      ],
+      "allowedExecutionProfiles": [
+        "deepagents"
+      ],
+      "compileEnabled": true,
+      "runtimeEnabled": true,
+      "defaultLibraryKinds": [
+        "deep_agent"
+      ],
+      "advancedLibraryKinds": [
+        "deep_agent"
+      ],
+      "bridgeTargets": [
+        "langgraph"
+      ],
+      "editorOnly": false
+    }
+  },
+  "interoperabilityBridges": [
+    {
+      "id": "langgraph_subgraph_wrapper",
+      "sourceMode": "langgraph",
+      "targetMode": "langgraph",
+      "sourceArtifactKinds": [
+        "subgraph"
+      ],
+      "targetArtifactKinds": [
+        "graph",
+        "subgraph"
+      ],
+      "wrapperNodeType": "sub_agent",
+      "status": "supported",
+      "supportLevel": "direct",
+      "adapterBacked": false,
+      "summary": "Saved LangGraph subgraphs can be reopened or inserted as wrapper-backed child graph references.",
+      "integrationModel": "direct_reference",
+      "executionKind": "direct_reference"
+    },
+    {
+      "id": "langchain_agent_wrapper_reference",
+      "sourceMode": "langchain",
+      "targetMode": "langgraph",
+      "sourceArtifactKinds": [
+        "agent"
+      ],
+      "targetArtifactKinds": [
+        "graph",
+        "subgraph"
+      ],
+      "wrapperNodeType": "sub_agent",
+      "status": "supported",
+      "supportLevel": "compile_capable",
+      "adapterBacked": true,
+      "summary": "Bounded LangChain agent artifacts can be lowered into LangGraph wrapper-backed subgraphs when they stay within explicit bridge contracts. Minimal agents use v1; small shared-safe tool subsets use v2; unsupported shapes remain editor/package-only.",
+      "bridgeContractId": "langchain_agent_to_langgraph_v1",
+      "bridgeConstraints": [
+        "source kind must be agent",
+        "v1: no custom tools, no nested artifact wrappers, react_agent nodes lower to llm_chat, all other nodes must already be LangGraph-allowed shared nodes",
+        "v2: only one shared-safe tool family per artifact is allowed",
+        "v2: allowed tool families are rpg_dice_roller or read-only sql_query",
+        "v2: tool-linked nodes must be react_agent and linked tools must exist in the artifact tool list",
+        "nested artifact wrapper bridges remain unsupported"
+      ],
+      "bridgeContractIds": [
+        "langchain_agent_to_langgraph_v1",
+        "langchain_agent_to_langgraph_v2"
+      ],
+      "bridgeAllowedToolFamilies": [
+        "rpg_dice_roller",
+        "sql_query"
+      ],
+      "bridgeAcceptedSourceShape": "LangChain agent artifacts using react_agent plus LangGraph-safe shared nodes; tool-enabled variants may link exactly one shared-safe tool family to react_agent.",
+      "bridgeRejectedReasonCodes": [
+        "unsupported_tool_family",
+        "mixed_tool_families_not_supported",
+        "sql_query_requires_local_db_path",
+        "unsupported_tool_carrier_node_type",
+        "nested_bridge_chain_not_supported",
+        "unsupported_node_type_for_executable_bridge",
+        "executable_bridge_requires_react_agent_tool_link",
+        "bridge_editor_package_only"
+      ],
+      "bridgeConstraintSummary": {
+        "sourceKind": "agent",
+        "contracts": [
+          "langchain_agent_to_langgraph_v1",
+          "langchain_agent_to_langgraph_v2"
+        ],
+        "allowedToolFamilies": [
+          "rpg_dice_roller",
+          "sql_query"
+        ],
+        "maxToolFamilyCount": 1,
+        "toolCarrierNodeTypes": [
+          "react_agent"
+        ],
+        "nestedBridgeChainsSupported": false,
+        "integrationModel": "lowered_bridge"
+      },
+      "integrationModel": "lowered_bridge",
+      "executionKind": "lowered_bridge"
+    },
+    {
+      "id": "langchain_agent_embedded_native",
+      "sourceMode": "langchain",
+      "targetMode": "langgraph",
+      "sourceArtifactKinds": [
+        "agent"
+      ],
+      "targetArtifactKinds": [
+        "graph",
+        "subgraph"
+      ],
+      "wrapperNodeType": "sub_agent",
+      "status": "supported",
+      "supportLevel": "compile_capable",
+      "integrationModel": "embedded_native",
+      "executionKind": "embedded_native",
+      "adapterBacked": true,
+      "summary": "A bounded LangChain agent artifact can be embedded as a native authored artifact node inside LangGraph orchestration. Provider-free and one bounded OpenAI-backed shape are supported; lowered bridges remain a separate integration model.",
+      "bridgeContractId": "langchain_agent_embedded_v1",
+      "bridgeContractIds": [
+        "langchain_agent_embedded_v1"
+      ],
+      "bridgeConstraints": [
+        "source kind must be agent",
+        "source mode must remain langchain",
+        "accepted shape is one bounded LangChain agent component using react_agent, llm_chat, or shared-safe local nodes",
+        "provider-backed embedded execution is currently bounded to OpenAI react_agent/llm_chat shapes using gpt-4o* models",
+        "shared-safe tools remain limited to one allowed family linked through react_agent",
+        "nested artifact wrapper bridges remain unsupported",
+        "embedded-native execution preserves artifact identity and wrapper reopen flow"
+      ],
+      "bridgeAllowedToolFamilies": [
+        "rpg_dice_roller",
+        "sql_query"
+      ],
+      "bridgeAcceptedSourceShape": "LangChain agent artifacts kept in native authored form with one bounded component using react_agent, llm_chat, or shared-safe local nodes; shared-safe tools remain limited to exactly one allowed family linked through react_agent.",
+      "bridgeRejectedReasonCodes": [
+        "unsupported_tool_family",
+        "mixed_tool_families_not_supported",
+        "unsupported_tool_carrier_node_type",
+        "nested_bridge_chain_not_supported",
+        "unsupported_node_type_for_embedded_native",
+        "unsupported_embedded_provider",
+        "unsupported_embedded_model",
+        "provider_config_missing",
+        "provider_init_failed",
+        "executable_bridge_requires_react_agent_tool_link",
+        "bridge_editor_package_only"
+      ],
+      "bridgeConstraintSummary": {
+        "sourceKind": "agent",
+        "contracts": [
+          "langchain_agent_embedded_v1"
+        ],
+        "integrationModel": "embedded_native",
+        "allowedToolFamilies": [
+          "rpg_dice_roller",
+          "sql_query"
+        ],
+        "maxToolFamilyCount": 1,
+        "toolCarrierNodeTypes": [
+          "react_agent"
+        ],
+        "nestedBridgeChainsSupported": false,
+        "acceptedProviderFamilies": [
+          "openai"
+        ],
+        "acceptedProviderModels": [
+          "gpt-4o",
+          "gpt-4o-mini"
+        ],
+        "requiredProviderEnvVars": [
+          "OPENAI_API_KEY"
+        ],
+        "eventProjection": [
+          "embedded_trace"
+        ]
+      }
+    },
+    {
+      "id": "deepagents_wrapper_reference",
+      "sourceMode": "deepagents",
+      "targetMode": "langgraph",
+      "sourceArtifactKinds": [
+        "deep_agent"
+      ],
+      "targetArtifactKinds": [
+        "graph",
+        "subgraph"
+      ],
+      "wrapperNodeType": "deep_agent_suite",
+      "status": "partial",
+      "supportLevel": "editor_package_only",
+      "adapterBacked": true,
+      "summary": "DeepAgents artifacts can be inserted into LangGraph workspaces as wrapper references for packaging/editor coordination only.",
+      "integrationModel": "lowered_bridge",
+      "executionKind": "lowered_bridge"
+    }
+  ],
+  "supportStatusLegend": {
+    "trunk_runtime": {
+      "label": "Trunk runtime",
+      "description": "Compiles and runs on the real LangGraph trunk without relying on an alias surface or an adapter-only bridge."
+    },
+    "bridge_backed_runtime": {
+      "label": "Bridge-backed runtime",
+      "description": "Runs through a real runtime path, but only through a wrapper, bridge, embedded-native reference, or other adapter-backed surface."
+    },
+    "editor_only": {
+      "label": "Editor-only",
+      "description": "Visible for authoring, packaging, compatibility, or inspection, but not exposed as an independently runnable runtime surface in the current build."
+    },
+    "alias_backed": {
+      "label": "Alias-backed",
+      "description": "Looks like its own surface in the editor, but currently compiles into another canonical runtime node or trunk path."
+    }
+  }
+}

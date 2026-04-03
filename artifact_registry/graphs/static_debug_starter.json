@@ -1,0 +1,63 @@
+{
+  "id": "static_debug_starter",
+  "kind": "graph",
+  "title": "Static Debug Starter",
+  "description": "Starter compile-safe : static_text alimente debug_print pour un premier flux visible sans dépendance provider.",
+  "built_in": true,
+  "artifact": {
+    "name": "Static Debug Starter",
+    "nodes": [
+      {
+        "id": "static_text_1",
+        "type": "custom",
+        "position": {
+          "x": 60,
+          "y": 180
+        },
+        "data": {
+          "nodeType": "static_text",
+          "label": "Static Text 1",
+          "params": {
+            "text": "Hello from the compile-safe starter.",
+            "output_key": "messages"
+          }
+        }
+      },
+      {
+        "id": "debug_print_2",
+        "type": "custom",
+        "position": {
+          "x": 340,
+          "y": 180
+        },
+        "data": {
+          "nodeType": "debug_print",
+          "label": "Debug Print 2",
+          "params": {
+            "input_key": "messages"
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1-2",
+        "source": "static_text_1",
+        "target": "debug_print_2",
+        "animated": true
+      }
+    ],
+    "customStateSchema": [],
+    "graphBindings": [],
+    "isAsync": true,
+    "artifactType": "graph",
+    "executionProfile": "langgraph_async",
+    "projectMode": "langgraph",
+    "runtimeSettings": {
+      "recursionLimit": 50,
+      "streamMode": "updates",
+      "debug": false,
+      "inheritParentBindings": true
+    }
+  }
+}

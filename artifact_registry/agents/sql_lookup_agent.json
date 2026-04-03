@@ -1,0 +1,116 @@
+{
+  "id": "sql_lookup_agent",
+  "kind": "agent",
+  "title": "SQL Lookup Agent Workflow",
+  "description": "LangChain agent starter with one shared-safe read-only SQL tool, intended for the v2 executable bridge.",
+  "built_in": true,
+  "artifact": {
+    "name": "SQL Lookup Agent Workflow",
+    "nodes": [
+      {
+        "id": "user_input_node_1",
+        "type": "custom",
+        "position": {
+          "x": 40,
+          "y": 160
+        },
+        "data": {
+          "nodeType": "user_input_node",
+          "label": "User Input 1",
+          "params": {
+            "prompt": "Lookup request",
+            "output_key": "messages"
+          }
+        }
+      },
+      {
+        "id": "react_agent_2",
+        "type": "custom",
+        "position": {
+          "x": 300,
+          "y": 150
+        },
+        "data": {
+          "nodeType": "react_agent",
+          "label": "React Agent 2",
+          "params": {
+            "provider": "openai",
+            "model_name": "gpt-4o",
+            "temperature": 0.2,
+            "system_prompt": "Use the SQL lookup tool only for local read-only questions.",
+            "tools_linked": [
+              "sql_lookup_1"
+            ]
+          }
+        }
+      },
+      {
+        "id": "chat_output_3",
+        "type": "custom",
+        "position": {
+          "x": 580,
+          "y": 160
+        },
+        "data": {
+          "nodeType": "chat_output",
+          "label": "Chat Output 3",
+          "params": {
+            "input_key": "messages"
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1-2",
+        "source": "user_input_node_1",
+        "target": "react_agent_2",
+        "animated": true
+      },
+      {
+        "id": "e2-3",
+        "source": "react_agent_2",
+        "target": "chat_output_3",
+        "animated": true
+      },
+      {
+        "id": "tool-edge-1",
+        "source": "sql_lookup_1",
+        "target": "react_agent_2",
+        "sourceHandle": "tool_out",
+        "targetHandle": "tools_in",
+        "animated": true
+      }
+    ],
+    "tools": [
+      {
+        "id": "sql_lookup_1",
+        "type": "sql_query",
+        "description": "Read-only lookup against a local SQLite file.",
+        "params": {
+          "db_path": "bridge_lookup.db"
+        },
+        "ui_meta": {
+          "nodeType": "tool_sql_query",
+          "position": {
+            "x": 110,
+            "y": 320
+          },
+          "label": "SQL Lookup 1"
+        }
+      }
+    ],
+    "customStateSchema": [],
+    "graphBindings": [],
+    "isAsync": true,
+    "artifactType": "agent",
+    "executionProfile": "langchain_agent",
+    "projectMode": "langchain",
+    "runtimeSettings": {
+      "recursionLimit": 50,
+      "streamMode": "updates",
+      "debug": false,
+      "inheritParentBindings": true
+    }
+  }
+}

@@ -1,0 +1,84 @@
+# Fichier généré automatiquement
+import ast
+import json
+import operator
+from typing import Annotated, Any, Optional, TypedDict
+from langchain_core.messages import AnyMessage
+from langgraph.graph.message import add_messages
+
+
+def update_dict(left: Optional[dict[str, Any]], right: Optional[dict[str, Any]]) -> dict[str, Any]:
+    merged = dict(left or {})
+    if right:
+        merged.update(right)
+    return merged
+
+
+def parse_binding_value(raw: Any) -> Any:
+    if not isinstance(raw, str):
+        return raw
+    text = raw.strip()
+    if text == "":
+        return ""
+    for parser in (json.loads, ast.literal_eval):
+        try:
+            return parser(text)
+        except Exception:
+            continue
+    lowered = text.lower()
+    if lowered == "true":
+        return True
+    if lowered == "false":
+        return False
+    if lowered == "null":
+        return None
+    return raw
+
+
+GRAPH_BINDINGS_METADATA = {{ resolved_graph_bindings_repr }}
+GRAPH_PROMPT_STRIP_METADATA = {{ prompt_strip_runtime_meta_repr }}
+GRAPH_VARIABLE_DEFAULTS = {
+{% for binding in resolved_graph_bindings if binding.kind == 'variable' %}
+    "{{ binding.name }}": parse_binding_value({{ binding.value | tojson }}),
+{% endfor %}
+}
+GRAPH_CONSTANTS = {
+{% for binding in resolved_graph_bindings if binding.kind == 'constant' %}
+    "{{ binding.name }}": parse_binding_value({{ binding.value | tojson }}),
+{% endfor %}
+}
+
+
+def bootstrap_state(initial_state: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+    state = dict(initial_state or {})
+    variables = update_dict(GRAPH_VARIABLE_DEFAULTS, state.get("__graph_variables__"))
+    constants = update_dict(GRAPH_CONSTANTS, state.get("__graph_constants__"))
+    state["__graph_bindings__"] = GRAPH_BINDINGS_METADATA
+    state["__prompt_strip_meta__"] = GRAPH_PROMPT_STRIP_METADATA
+    state["__graph_variables__"] = variables
+    state["__graph_constants__"] = constants
+    for key, value in variables.items():
+        state.setdefault(key, value)
+    for key, value in constants.items():
+        state.setdefault(key, value)
+    return state
+
+
+class AgentState(TypedDict):
+    {% if not state_schema %}
+    pass
+    {% else %}
+    {% for prop in state_schema %}
+    {% if prop.reducer == 'add_messages' %}
+    {{ prop.name }}: Annotated[list[AnyMessage], add_messages]
+    {% elif prop.reducer == 'operator.add' %}
+    {{ prop.name }}: Annotated[list[Any], operator.add]
+    {% elif prop.reducer == 'update' %}
+    {{ prop.name }}: Annotated[dict[str, Any], update_dict]
+    {% elif prop.reducer == 'none' %}
+    {{ prop.name }}: Optional[{{ prop.type | default('Any') }}]
+    {% else %}
+    {{ prop.name }}: {{ prop.type | default('Any') }}
+    {% endif %}
+    {% endfor %}
+    {% endif %}

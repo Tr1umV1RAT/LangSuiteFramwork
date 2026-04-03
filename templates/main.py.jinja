@@ -1,0 +1,57 @@
+import asyncio
+import uuid
+from graph import graph
+from state import bootstrap_state
+
+{% if is_async %}
+async def main():
+    print("\n" + "="*50)
+    print("🚀 Démarrage de l'Agent LangGraph")
+    print("="*50 + "\n")
+
+    thread_id = str(uuid.uuid4())
+    config = {"configurable": {"thread_id": thread_id}}
+
+    while True:
+        try:
+            user_input = input("\nVous : ")
+            if user_input.lower() in ['quit', 'exit', 'q']:
+                break
+
+            initial_state = bootstrap_state({"messages": [("user", user_input)]})
+
+            async for event in graph.astream(initial_state, config, stream_mode="updates"):
+                for node_name, node_data in event.items():
+                    print(f"\n[🔄 {node_name}]")
+        except Exception as e:
+            print(f"\n❌ Erreur d'exécution : {e}")
+{% else %}
+def main():
+    print("\n" + "="*50)
+    print("🚀 Démarrage de l'Agent LangGraph")
+    print("="*50 + "\n")
+
+    thread_id = str(uuid.uuid4())
+    config = {"configurable": {"thread_id": thread_id}}
+
+    while True:
+        try:
+            user_input = input("\nVous : ")
+            if user_input.lower() in ['quit', 'exit', 'q']:
+                break
+
+            initial_state = bootstrap_state({"messages": [("user", user_input)]})
+
+            for event in graph.stream(initial_state, config, stream_mode="updates"):
+                for node_name, node_data in event.items():
+                    print(f"\n[🔄 {node_name}]")
+        except Exception as e:
+            print(f"\n❌ Erreur d'exécution : {e}")
+{% endif %}
+
+if __name__ == "__main__":
+    {% if is_async %}
+    asyncio.run(main())
+    {% else %}
+    main()
+    {% endif %}

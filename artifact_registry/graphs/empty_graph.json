@@ -1,0 +1,23 @@
+{
+  "id": "empty_graph",
+  "kind": "graph",
+  "title": "Empty Graph",
+  "description": "Graph LangGraph vide pour partir de zéro.",
+  "built_in": true,
+  "artifact": {
+    "name": "Empty Graph",
+    "nodes": [],
+    "edges": [],
+    "customStateSchema": [],
+    "graphBindings": [],
+    "isAsync": true,
+    "artifactType": "graph",
+    "executionProfile": "langgraph_async",
+    "runtimeSettings": {
+      "recursionLimit": 50,
+      "streamMode": "updates",
+      "debug": false,
+      "inheritParentBindings": true
+    }
+  }
+}

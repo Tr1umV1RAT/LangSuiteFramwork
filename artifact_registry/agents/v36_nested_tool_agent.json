@@ -1,0 +1,31 @@
+{
+  "id": "v36_nested_tool_agent",
+  "kind": "agent",
+  "title": "v36 nested tool agent",
+  "description": "",
+  "built_in": false,
+  "artifact": {
+    "name": "v36 nested tool agent",
+    "artifactType": "agent",
+    "executionProfile": "langchain_agent",
+    "projectMode": "langchain",
+    "nodes": [
+      {
+        "id": "sub_agent_1",
+        "type": "custom",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "data": {
+          "nodeType": "sub_agent",
+          "label": "Sub Agent 1",
+          "params": {
+            "target_subgraph": "artifact:agent/minimal_agent"
+          }
+        }
+      }
+    ],
+    "edges": []
+  }
+}

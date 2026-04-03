@@ -1,0 +1,43 @@
+{
+  "id": "minimal_agent",
+  "kind": "agent",
+  "title": "Minimal Agent",
+  "description": "Agent minimal avec un nœud react_agent.",
+  "built_in": true,
+  "artifact": {
+    "name": "Minimal Agent",
+    "nodes": [
+      {
+        "id": "react_agent_1",
+        "type": "custom",
+        "position": {
+          "x": 260,
+          "y": 180
+        },
+        "data": {
+          "nodeType": "react_agent",
+          "label": "React Agent 1",
+          "params": {
+            "provider": "openai",
+            "model_name": "gpt-4o",
+            "temperature": 0.3,
+            "system_prompt": "Tu es un agent utile.",
+            "tools_linked": []
+          }
+        }
+      }
+    ],
+    "edges": [],
+    "customStateSchema": [],
+    "graphBindings": [],
+    "isAsync": true,
+    "artifactType": "agent",
+    "executionProfile": "langchain_agent",
+    "runtimeSettings": {
+      "recursionLimit": 50,
+      "streamMode": "updates",
+      "debug": false,
+      "inheritParentBindings": true
+    }
+  }
+}

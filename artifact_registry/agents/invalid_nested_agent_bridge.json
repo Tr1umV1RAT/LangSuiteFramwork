@@ -1,0 +1,31 @@
+{
+  "id": "invalid_nested_agent_bridge",
+  "kind": "agent",
+  "title": "invalid nested agent bridge",
+  "description": "",
+  "built_in": false,
+  "artifact": {
+    "name": "invalid nested agent bridge",
+    "artifactType": "agent",
+    "executionProfile": "langchain_agent",
+    "projectMode": "langchain",
+    "nodes": [
+      {
+        "id": "sub_agent_1",
+        "type": "custom",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "data": {
+          "nodeType": "sub_agent",
+          "label": "Sub Agent 1",
+          "params": {
+            "target_subgraph": "artifact:subgraph/empty_subgraph"
+          }
+        }
+      }
+    ],
+    "edges": []
+  }
+}

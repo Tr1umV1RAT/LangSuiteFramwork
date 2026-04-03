@@ -1,0 +1,29 @@
+{
+  "id": "deep_agent_shell",
+  "kind": "deep_agent",
+  "title": "Deep Agent Shell",
+  "description": "Coque éditoriale Deep Agents avec réglages de base.",
+  "built_in": true,
+  "artifact": {
+    "name": "Deep Agent Shell",
+    "nodes": [],
+    "edges": [],
+    "customStateSchema": [],
+    "graphBindings": [
+      {
+        "name": "task_description",
+        "value": "",
+        "kind": "variable"
+      }
+    ],
+    "isAsync": true,
+    "artifactType": "deep_agent",
+    "executionProfile": "deepagents",
+    "runtimeSettings": {
+      "recursionLimit": 75,
+      "streamMode": "updates",
+      "debug": true,
+      "inheritParentBindings": true
+    }
+  }
+}

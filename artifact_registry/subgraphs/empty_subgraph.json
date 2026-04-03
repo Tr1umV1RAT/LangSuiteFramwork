@@ -1,0 +1,23 @@
+{
+  "id": "empty_subgraph",
+  "kind": "subgraph",
+  "title": "Empty Subgraph",
+  "description": "Sous-graphe vide, destiné à être wrappé comme nœud.",
+  "built_in": true,
+  "artifact": {
+    "name": "Empty Subgraph",
+    "nodes": [],
+    "edges": [],
+    "customStateSchema": [],
+    "graphBindings": [],
+    "isAsync": true,
+    "artifactType": "subgraph",
+    "executionProfile": "langgraph_async",
+    "runtimeSettings": {
+      "recursionLimit": 50,
+      "streamMode": "updates",
+      "debug": false,
+      "inheritParentBindings": true
+    }
+  }
+}

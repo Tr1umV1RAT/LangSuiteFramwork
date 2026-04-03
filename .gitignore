@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+.pytest_cache/
+*.pyc
+
+# Frontend
+client/node_modules/
+client/dist/
+client/tsconfig.tsbuildinfo
+static/assets/
+static/index.html
+
+# Local app/runtime state
+db/langgraph_builder.db
+
+# OS/editor noise
+.DS_Store
+Thumbs.db

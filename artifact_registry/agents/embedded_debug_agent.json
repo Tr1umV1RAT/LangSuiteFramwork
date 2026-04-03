@@ -1,0 +1,40 @@
+{
+  "id": "embedded_debug_agent",
+  "kind": "agent",
+  "title": "Embedded Native Debug Agent",
+  "description": "Provider-free LangChain authoring artifact intended for the embedded-native LangGraph execution path.",
+  "built_in": true,
+  "artifact": {
+    "name": "Embedded Native Debug Agent",
+    "nodes": [
+      {
+        "id": "debug_print_1",
+        "type": "custom",
+        "position": {
+          "x": 260,
+          "y": 180
+        },
+        "data": {
+          "nodeType": "debug_print",
+          "label": "Debug Print 1",
+          "params": {
+            "input_key": "messages"
+          }
+        }
+      }
+    ],
+    "edges": [],
+    "customStateSchema": [],
+    "graphBindings": [],
+    "isAsync": true,
+    "artifactType": "agent",
+    "executionProfile": "langchain_agent",
+    "projectMode": "langchain",
+    "runtimeSettings": {
+      "recursionLimit": 50,
+      "streamMode": "updates",
+      "debug": false,
+      "inheritParentBindings": true
+    }
+  }
+}

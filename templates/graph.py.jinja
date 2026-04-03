@@ -1,0 +1,301 @@
+# Fichier généré automatiquement
+from langgraph.graph import StateGraph, START, END
+from typing_extensions import TypedDict
+from langgraph.prebuilt import ToolNode
+{% if has_send_nodes %}from langgraph.types import Send
+{% endif %}
+
+from state import AgentState, bootstrap_state, GRAPH_BINDINGS_METADATA, GRAPH_VARIABLE_DEFAULTS, GRAPH_CONSTANTS
+from nodes import *
+from tools import ACTIVE_TOOLS
+{% if has_memory and runtime_settings.storeBackend == 'sqlite_local' %}from typing import Any
+{% endif %}
+
+{% set marker_types = ["logic_router", "structured_output_router", "memory_checkpoint"] %}
+
+class GraphRuntimeContext(TypedDict, total=False):
+    pass
+
+GRAPH_UI_CONTEXT = {{ ui_context_repr }}
+GRAPH_RUNTIME_SETTINGS = {{ runtime_settings_repr }}
+GRAPH_EXTERNAL_ARTIFACTS = {{ external_artifacts_repr }}
+
+{% if use_checkpoint %}
+{% if checkpoint_type == 'sqlite' %}
+{% if is_async %}
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+{% else %}
+from langgraph.checkpoint.sqlite import SqliteSaver
+import sqlite3
+{% endif %}
+{% else %}
+from langgraph.checkpoint.memory import MemorySaver
+{% endif %}
+{% endif %}
+
+{% if has_memory %}
+{% if runtime_settings.storeBackend == 'sqlite_local' %}
+import json
+import sqlite3
+from dataclasses import dataclass
+
+@dataclass
+class _SQLiteStoreItem:
+    namespace: tuple[Any, ...]
+    key: str
+    value: Any
+
+
+class SQLiteRuntimeStore:
+    def __init__(self, path: str):
+        self.path = path
+        self._ensure_schema()
+
+    def _connect(self):
+        return sqlite3.connect(self.path, check_same_thread=False)
+
+    def _ensure_schema(self):
+        with self._connect() as conn:
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS store_items (namespace TEXT NOT NULL, item_key TEXT NOT NULL, value_json TEXT NOT NULL, updated_at REAL NOT NULL DEFAULT (strftime('%%s','now')), PRIMARY KEY(namespace, item_key))"
+            )
+
+    def get(self, namespace, key):
+        ns = json.dumps(list(namespace) if isinstance(namespace, tuple) else namespace)
+        with self._connect() as conn:
+            row = conn.execute("SELECT value_json FROM store_items WHERE namespace = ? AND item_key = ?", (ns, key)).fetchone()
+        if not row:
+            return None
+        return _SQLiteStoreItem(tuple(json.loads(ns)), key, json.loads(row[0]))
+
+    async def aget(self, namespace, key):
+        return self.get(namespace, key)
+
+    def put(self, namespace, key, value):
+        ns_list = list(namespace) if isinstance(namespace, tuple) else namespace
+        ns = json.dumps(ns_list)
+        value_json = json.dumps(value)
+        with self._connect() as conn:
+            conn.execute("INSERT OR REPLACE INTO store_items (namespace, item_key, value_json, updated_at) VALUES (?, ?, ?, strftime('%%s','now'))", (ns, key, value_json))
+
+    async def aput(self, namespace, key, value):
+        self.put(namespace, key, value)
+
+    def search(self, namespace, query: str = '', limit: int = 5):
+        ns_list = list(namespace) if isinstance(namespace, tuple) else namespace
+        ns = json.dumps(ns_list)
+        query_text = (query or '').lower()
+        with self._connect() as conn:
+            rows = conn.execute("SELECT item_key, value_json FROM store_items WHERE namespace = ? ORDER BY updated_at DESC", (ns,)).fetchall()
+        items = []
+        for item_key, value_json in rows:
+            value = json.loads(value_json)
+            haystack = json.dumps(value).lower()
+            if query_text and query_text not in haystack and query_text not in str(item_key).lower():
+                continue
+            items.append(_SQLiteStoreItem(tuple(ns_list) if isinstance(ns_list, list) else tuple(namespace), item_key, value))
+            if len(items) >= limit:
+                break
+        return items
+
+    async def asearch(self, namespace, query: str = '', limit: int = 5):
+        return self.search(namespace, query=query, limit=limit)
+
+    def delete(self, namespace, key):
+        ns = json.dumps(list(namespace) if isinstance(namespace, tuple) else namespace)
+        with self._connect() as conn:
+            conn.execute("DELETE FROM store_items WHERE namespace = ? AND item_key = ?", (ns, key))
+
+    async def adelete(self, namespace, key):
+        self.delete(namespace, key)
+
+
+store = SQLiteRuntimeStore({{ runtime_settings.storePath | tojson }})
+{% else %}
+from langgraph.store.memory import InMemoryStore
+store = InMemoryStore()
+{% endif %}
+{% endif %}
+
+{% for comp in components %}
+{% if comp.bridge_contract_id %}
+# External artifact graph {{ comp.graph_key }} compiled via {{ comp.bridge_contract_id }} using {{ comp.bridge_integration_model | default('lowered_bridge') }} from {{ comp.bridge_source_mode }} artifact {{ comp.bridge_artifact_id }}
+{% endif %}
+{% for node in comp.graph_nodes %}
+{% if node.type in ('llm_chat', 'react_agent') and node.params.tools_linked %}
+def {{ node.id }}_router(state: AgentState):
+    messages = state.get("messages", [])
+    if messages:
+        last_message = messages[-1]
+        # Utilisation de getattr pour éviter les crashs avec HumanMessage
+        if getattr(last_message, "tool_calls", None):
+            return "continue"
+    return "end"
+
+{% endif %}
+{% endfor %}
+
+def build_graph_{{ comp.function_name }}():
+    builder = StateGraph(AgentState, context_schema=GraphRuntimeContext)
+
+    {% for node in comp.graph_nodes %}
+    {% if node.type not in marker_types %}
+    {% set command_targets = comp.edges | selectattr('source', 'equalto', node.id) | selectattr('type', 'equalto', 'direct') | map(attribute='target') | list %}
+    {% if node.type in ('command_node', 'handoff_node') and command_targets %}
+    builder.add_node("{{ node.id }}", {{ node.id }}_node, ends={{ command_targets | tojson }})
+    {% else %}
+    builder.add_node("{{ node.id }}", {{ node.id }}_node)
+    {% endif %}
+    {% endif %}
+    {% endfor %}
+
+    {% if comp.needs_tool_node %}
+    builder.add_node("tools_execution", ToolNode(ACTIVE_TOOLS))
+
+    {# Câblage automatique LLM <-> Tools #}
+    {% for node in comp.graph_nodes %}
+    {% if node.type in ('llm_chat', 'react_agent') and node.params.tools_linked %}
+
+    {# On cherche le noeud visuel branché APRÈS le LLM (ex: le Human Interrupt) #}
+    {% set next_edges = comp.edges | selectattr("source", "equalto", node.id) | list %}
+    {% set next_target = next_edges[0].target if next_edges else 'END' %}
+
+    builder.add_conditional_edges(
+        "{{ node.id }}",
+        {{ node.id }}_router,
+        {"continue": "tools_execution", "end": {% if next_target == 'END' %}END{% else %}"{{ next_target }}"{% endif %}}
+    )
+    # Retour automatique des tools vers le LLM
+    builder.add_edge("tools_execution", "{{ node.id }}")
+    {% endif %}
+    {% endfor %}
+    {% endif %}
+
+    {% set router_id_set = comp.nodes | selectattr('type', 'equalto', 'logic_router') | map(attribute='id') | list %}
+    {% for e in comp.edges %}
+    {% if e.type == 'direct' %}
+    {% set src_node = comp.graph_nodes | selectattr("id", "equalto", e.source) | first | default(None) %}
+    {% if src_node and src_node.type in ('llm_chat', 'react_agent') and src_node.params.tools_linked %}
+    # Lien direct ignoré car le LLM possède des outils (géré par le routeur conditionnel plus haut)
+    {% elif src_node and src_node.type == 'send_fanout' %}
+    # Lien direct ignoré ici : send_fanout utilise add_conditional_edges + Send API plus bas
+    {% else %}
+    builder.add_edge("{{ e.source }}", "{{ e.target }}")
+    {% endif %}
+    {% endif %}
+    {% endfor %}
+
+    {% set conditional_routers = {} %}
+    {% for edge in comp.edges %}
+    {% if edge.type == 'conditional' and edge.router_id %}
+    {% if edge.router_id not in conditional_routers %}
+    {% set _ = conditional_routers.update({edge.router_id: []}) %}
+    {% endif %}
+    {% set _ = conditional_routers[edge.router_id].append(edge) %}
+    {% endif %}
+    {% endfor %}
+
+    {% for router_id, cond_edges in conditional_routers.items() %}
+    {% set incoming_edges = comp.edges | selectattr('target', 'equalto', router_id) | selectattr('type', 'equalto', 'direct') | list %}
+    {% set source_of_router = incoming_edges[0].source if incoming_edges else router_id %}
+    builder.add_conditional_edges(
+        "{{ source_of_router }}",
+        {{ router_id }}_route,
+        {
+            {% for ce in cond_edges %}
+            "{{ ce.condition }}": "{{ ce.target }}",
+            {% endfor %}
+        }
+    )
+    {% endfor %}
+
+
+    {% for node in comp.graph_nodes %}
+    {% if node.type == 'send_fanout' and node.params.send_target %}
+    builder.add_conditional_edges(
+        "{{ node.id }}",
+        {{ node.id }}_dispatch,
+        ["{{ node.params.send_target }}"]
+    )
+    {% endif %}
+    {% endfor %}
+
+    {% if comp.entry_node_id %}
+    builder.add_edge(START, "{{ comp.entry_node_id }}")
+    {% endif %}
+
+    compile_kwargs = {}
+    {% if use_checkpoint %}
+    {% if checkpoint_type == 'sqlite' %}
+    {% if is_async %}
+    compile_kwargs["checkpointer"] = AsyncSqliteSaver.from_conn_string("checkpoints.db")
+    {% else %}
+    compile_kwargs["checkpointer"] = SqliteSaver(sqlite3.connect("checkpoints.db", check_same_thread=False))
+    {% endif %}
+    {% else %}
+    compile_kwargs["checkpointer"] = MemorySaver()
+    {% endif %}
+    {% endif %}
+    {% if has_memory %}
+    compile_kwargs["store"] = store
+    {% endif %}
+    {% if comp.interrupt_before %}
+    compile_kwargs["interrupt_before"] = {{ comp.interrupt_before }}
+    {% endif %}
+
+    return builder.compile(**compile_kwargs)
+
+{% endfor %}
+
+{% if not components %}
+def _empty_graph_passthrough(state: AgentState):
+    return state
+
+
+def build_graph_main():
+    builder = StateGraph(AgentState, context_schema=GraphRuntimeContext)
+    builder.add_node("__empty_passthrough__", _empty_graph_passthrough)
+    builder.add_edge(START, "__empty_passthrough__")
+    builder.add_edge("__empty_passthrough__", END)
+
+    compile_kwargs = {}
+    {% if use_checkpoint %}
+    {% if checkpoint_type == 'sqlite' %}
+    {% if is_async %}
+    compile_kwargs["checkpointer"] = AsyncSqliteSaver.from_conn_string("checkpoints.db")
+    {% else %}
+    compile_kwargs["checkpointer"] = SqliteSaver(sqlite3.connect("checkpoints.db", check_same_thread=False))
+    {% endif %}
+    {% else %}
+    compile_kwargs["checkpointer"] = MemorySaver()
+    {% endif %}
+    {% endif %}
+    {% if has_memory %}
+    compile_kwargs["store"] = store
+    {% endif %}
+
+    return builder.compile(**compile_kwargs)
+
+
+graphs = {"main": build_graph_main()}
+{% elif multi_graph %}
+graphs = {
+    {% for comp in components %}
+    {{ comp.graph_key | tojson }}: build_graph_{{ comp.function_name }}(),
+    {% endfor %}
+}
+{% else %}
+graphs = {"main": build_graph_main()}
+{% endif %}
+
+graph = graphs["main"]
+
+{% if is_async %}
+async def run_graph(inputs: dict, config: dict | None = None):
+    prepared_inputs = bootstrap_state(inputs)
+    return await graph.ainvoke(prepared_inputs, config=config or {})
+{% else %}
+def run_graph(inputs: dict, config: dict | None = None):
+    prepared_inputs = bootstrap_state(inputs)
+    return graph.invoke(prepared_inputs, config=config or {})
+{% endif %}

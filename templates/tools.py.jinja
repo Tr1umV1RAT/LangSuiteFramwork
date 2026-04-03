@@ -1,0 +1,2262 @@
+# Fichier généré automatiquement par le LangGraph Visual Builder
+from langchain_core.tools import tool
+from textwrap import dedent
+import ast
+import os
+import re
+import requests
+import json
+import shlex
+import subprocess
+from pathlib import Path
+from urllib.parse import urljoin, urlparse
+
+{% if has_playwright %}
+# --- SETUP BROWSER PLAYWRIGHT (Singleton) ---
+{% if is_async %}
+try:
+    from playwright.async_api import async_playwright
+    _PW_AVAILABLE = True
+except ImportError:
+    _PW_AVAILABLE = False
+
+_playwright_context = {}
+
+async def get_playwright_page():
+    """Gère une instance unique du navigateur pour tous les outils web."""
+    if "page" not in _playwright_context:
+        if not _PW_AVAILABLE:
+            return None
+        try:
+            p = await async_playwright().start()
+            _playwright_context["playwright"] = p
+            browser = await p.chromium.launch(headless=True)
+            _playwright_context["browser"] = browser
+            _playwright_context["page"] = await browser.new_page()
+        except Exception:
+            return None
+    return _playwright_context.get("page")
+{% else %}
+try:
+    from playwright.sync_api import sync_playwright
+    _PW_AVAILABLE = True
+except ImportError:
+    _PW_AVAILABLE = False
+
+_playwright_context = {}
+
+def get_playwright_page():
+    """Gère une instance unique du navigateur pour tous les outils web."""
+    if "page" not in _playwright_context:
+        if not _PW_AVAILABLE:
+            return None
+        try:
+            p = sync_playwright().start()
+            _playwright_context["playwright"] = p
+            browser = p.chromium.launch(headless=True)
+            _playwright_context["browser"] = browser
+            _playwright_context["page"] = browser.new_page()
+        except Exception:
+            return None
+    return _playwright_context.get("page")
+{% endif %}
+{% endif %}
+
+
+SUBAGENT_LIBRARY = {{ runtime_settings.subagentLibrary | default([], true) | tojson }}
+SHELL_EXECUTION_ENABLED = {{ "True" if runtime_settings.shellExecutionEnabled else "False" }}
+
+PROVIDER_ALIASES = {
+{% for provider_name, provider_meta in provider_contracts.providers.items() %}
+{% for alias in provider_meta.aliases | default([], true) %}
+    {{ alias | tojson }}: {{ provider_name | tojson }},
+{% endfor %}
+{% endfor %}
+}
+OPENAI_COMPAT_PROVIDER_FAMILIES = set({{ openai_compatible_provider_families | tojson }})
+PROVIDER_ENV_VARS = {{ provider_env_vars | tojson }}
+
+
+def _normalize_provider(provider: str) -> str:
+    raw = (provider or '').strip().lower()
+    return PROVIDER_ALIASES.get(raw, raw)
+
+
+def _ensure_provider_configuration(provider: str, explicit_env: str | None = None) -> None:
+    provider = _normalize_provider(provider)
+    env_name = (explicit_env or '').strip() or PROVIDER_ENV_VARS.get(provider)
+    if not env_name:
+        return
+    if os.getenv(env_name):
+        return
+    raise RuntimeError(f"[provider_config_missing] Provider '{provider}' requires environment variable '{env_name}' for runtime execution")
+
+
+def _build_chat_model(*, provider: str, model_name: str, temperature: float, explicit_env: str | None = None, api_base_url: str | None = None, max_tokens: int | None = None, top_p: float | None = None, frequency_penalty: float | None = None, presence_penalty: float | None = None, stop_sequences: list[str] | None = None):
+    provider = _normalize_provider(provider)
+    api_base_url = (api_base_url or '').strip() or None
+    if provider in OPENAI_COMPAT_PROVIDER_FAMILIES:
+        if not api_base_url:
+            raise RuntimeError(f"[provider_config_missing] Provider '{provider}' requires api_base_url for runtime execution")
+        from langchain_openai import ChatOpenAI
+        api_key = (os.getenv((explicit_env or '').strip()) if (explicit_env or '').strip() else None) or os.getenv('OPENAI_API_KEY') or 'not-needed'
+        kwargs = {
+            'model': model_name,
+            'temperature': temperature,
+            'base_url': api_base_url,
+            'api_key': api_key,
+        }
+        if max_tokens is not None:
+            kwargs['max_tokens'] = max_tokens
+        if top_p is not None:
+            kwargs['top_p'] = top_p
+        if frequency_penalty is not None:
+            kwargs['frequency_penalty'] = frequency_penalty
+        if presence_penalty is not None:
+            kwargs['presence_penalty'] = presence_penalty
+        if stop_sequences:
+            kwargs['stop'] = stop_sequences
+        return ChatOpenAI(**kwargs)
+    _ensure_provider_configuration(provider, explicit_env)
+    from langchain.chat_models import init_chat_model
+    llm = init_chat_model(model=model_name, model_provider=provider, temperature=temperature)
+    extra_kwargs = {}
+    if max_tokens is not None:
+        extra_kwargs['max_tokens'] = max_tokens
+    if top_p is not None:
+        extra_kwargs['top_p'] = top_p
+    if frequency_penalty is not None:
+        extra_kwargs['frequency_penalty'] = frequency_penalty
+    if presence_penalty is not None:
+        extra_kwargs['presence_penalty'] = presence_penalty
+    if stop_sequences:
+        extra_kwargs['stop'] = stop_sequences
+    if extra_kwargs and hasattr(llm, 'bind'):
+        llm = llm.bind(**extra_kwargs)
+    return llm
+
+
+def _find_subagent_group(group_name: str | None):
+    wanted_group = (group_name or '').strip() or 'default'
+    for group in SUBAGENT_LIBRARY:
+        if not isinstance(group, dict):
+            continue
+        group_label = str(group.get('name') or '').strip() or 'default'
+        if group_label == wanted_group:
+            return {'group': group_label, 'agents': group.get('agents', []) or []}
+    return None
+
+
+def _find_subagent_entry(group_name: str | None, agent_name: str | None):
+    if not agent_name:
+        return None
+    resolved_group = _find_subagent_group(group_name)
+    if not resolved_group:
+        return None
+    wanted_agent = (agent_name or '').strip()
+    for agent in resolved_group.get('agents', []) or []:
+        if not isinstance(agent, dict):
+            continue
+        if str(agent.get('name') or '').strip() == wanted_agent:
+            return {'group': resolved_group['group'], 'agent': agent}
+    return None
+
+
+def _resolve_subagent_tools(agent_entry):
+    tool_ids = []
+    if isinstance(agent_entry, dict):
+        tool_ids = agent_entry.get('tools', []) or []
+    return [ACTIVE_TOOLS_BY_ID[tool_id] for tool_id in tool_ids if tool_id in ACTIVE_TOOLS_BY_ID]
+
+
+def _invoke_subagent(agent_entry, prompt_text: str, *, provider: str, model_name: str, temperature: float, explicit_env: str | None = None, api_base_url: str | None = None, max_tokens: int | None = None, top_p: float | None = None, frequency_penalty: float | None = None, presence_penalty: float | None = None, stop_sequences: list[str] | None = None):
+    from langchain_core.messages import SystemMessage, HumanMessage
+    subagent_tools = _resolve_subagent_tools(agent_entry)
+    llm = _build_chat_model(provider=provider, model_name=model_name, temperature=temperature, explicit_env=explicit_env, api_base_url=api_base_url, max_tokens=max_tokens, top_p=top_p, frequency_penalty=frequency_penalty, presence_penalty=presence_penalty, stop_sequences=stop_sequences)
+    llm_with_tools = llm.bind_tools(subagent_tools) if subagent_tools else llm
+    msgs = [
+        SystemMessage(content=str(agent_entry.get('systemPrompt') or 'Tu es un sous-agent expert invoqué comme outil.')),
+        HumanMessage(content=prompt_text),
+    ]
+    return llm_with_tools, msgs
+
+
+def _format_subagent_group_listing(group_name: str | None):
+    resolved_group = _find_subagent_group(group_name)
+    if not resolved_group:
+        return []
+    rows = []
+    for agent in resolved_group.get('agents', []) or []:
+        if not isinstance(agent, dict):
+            continue
+        rows.append({
+            'name': str(agent.get('name') or '').strip(),
+            'description': str(agent.get('description') or '').strip(),
+        })
+    return [row for row in rows if row['name']]
+
+
+def _subagent_hint_text(tool_name: str, group_name: str | None, target_agent: str | None, *, max_invocations: int, allow_repeat: bool):
+    if target_agent:
+        return f"Tool '{tool_name}' delegates to subagent '{target_agent}' in group '{group_name or 'default'}'. Use it when this specialist is needed. The subagent runs ephemerally with its configured system prompt and tools. Max invocations: {max_invocations}. Repeats allowed: {allow_repeat}."
+    listing = _format_subagent_group_listing(group_name)
+    available = ', '.join(f"{row['name']} ({row['description'] or 'no description'})" for row in listing) or 'none'
+    return f"Tool '{tool_name}' dispatches to subagents from group '{group_name or 'default'}'. Call it with agent_name and description. Available agents: {available}. The selected subagent runs ephemerally with its configured system prompt and tools. Max invocations: {max_invocations}. Repeats allowed: {allow_repeat}."
+
+
+SUBAGENT_TOOL_HINTS = {
+{% for t in tools if t.type == 'sub_agent_tool' %}
+    {{ t.id | tojson }}: _subagent_hint_text(
+        {{ t.id | tojson }},
+        {{ t.params.target_group | default('default', true) | tojson }},
+        {{ t.params.target_agent | default('', true) | tojson }},
+        max_invocations={{ t.params.max_invocations | default(1, true) }},
+        allow_repeat={{ 'True' if t.params.allow_repeat == 'true' else 'False' }},
+    ),
+{% endfor %}
+}
+
+
+def _normalize_sqlite_target(db_path: str | None) -> tuple[str, str]:
+    raw_value = str(db_path or 'data.db').strip() or 'data.db'
+    if raw_value.startswith('sqlite:///'):
+        return raw_value, raw_value[len('sqlite:///'):]
+    return f"sqlite:///{raw_value}", raw_value
+
+
+def _sql_read_only_guard(query: str) -> tuple[bool, str]:
+    stripped = (query or '').strip()
+    if not stripped:
+        return False, 'SQL query is empty.'
+    normalized = stripped.lower()
+    if ';' in stripped.rstrip(';'):
+        return False, 'Read-only mode rejects multiple SQL statements.'
+    allowed_prefixes = ('select', 'with', 'pragma', 'explain')
+    if not normalized.startswith(allowed_prefixes):
+        return False, 'Read-only mode only allows SELECT / WITH / PRAGMA / EXPLAIN queries in this pass.'
+    blocked_tokens = ('insert ', 'update ', 'delete ', 'drop ', 'alter ', 'create ', 'replace ', 'truncate ', 'attach ', 'detach ', 'vacuum', 'reindex ')
+    if any(token in normalized for token in blocked_tokens):
+        return False, 'Read-only mode blocked a mutating or unsafe SQL statement.'
+    return True, 'Query accepted by the read-only guard.'
+
+
+def _coerce_bool(value, default: bool = False) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return default
+    if isinstance(value, (int, float)):
+        return bool(value)
+    normalized = str(value).strip().lower()
+    if normalized in {'true', '1', 'yes', 'y', 'on'}:
+        return True
+    if normalized in {'false', '0', 'no', 'n', 'off'}:
+        return False
+    return default
+
+
+def _truncate_text(value, max_chars: int = 4000) -> tuple[str, bool]:
+    text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, default=str)
+    if len(text) <= max_chars:
+        return text, False
+    return text[:max_chars] + "\n... (truncated)", True
+
+
+def _sql_limit_warning(query: str) -> str | None:
+    normalized = (query or '').strip().lower()
+    if not normalized:
+        return None
+    if normalized.startswith(('select', 'with')) and ' limit ' not in normalized and not normalized.endswith(' limit'):
+        return 'Consider adding LIMIT for more compact, predictable previews.'
+    return None
+
+
+def _normalize_positive_int(value: str, *, label: str) -> tuple[int | None, str | None]:
+    raw = str(value or '').strip()
+    if not raw:
+        return None, f'{label} is required.'
+    try:
+        parsed = int(raw)
+    except Exception:
+        return None, f'{label} must be an integer.'
+    if parsed <= 0:
+        return None, f'{label} must be a positive integer.'
+    return parsed, None
+
+
+def _resolve_filesystem_root(root_path: str | None) -> tuple[Path | None, str | None]:
+    raw = str(root_path or '.').strip() or '.'
+    try:
+        resolved = Path(raw).expanduser().resolve()
+    except Exception as exc:
+        return None, f"Invalid filesystem root '{raw}': {exc}"
+    if not resolved.exists():
+        return None, f"Filesystem root does not exist: {resolved}"
+    if not resolved.is_dir():
+        return None, f"Filesystem root is not a directory: {resolved}"
+    return resolved, None
+
+
+def _is_hidden_relative(path: Path) -> bool:
+    return any(part.startswith('.') for part in path.parts if part not in ('', '.'))
+
+
+def _resolve_filesystem_target(root_path: str | None, relative_path: str, *, allow_directory: bool) -> tuple[Path | None, Path | None, str | None]:
+    root, root_error = _resolve_filesystem_root(root_path)
+    if root_error or root is None:
+        return None, None, root_error
+    raw = str(relative_path or '').strip()
+    if not raw:
+        target = root
+    else:
+        normalized = raw.replace('\\', '/')
+        if normalized.startswith('/'):
+            return root, None, 'Filesystem path must be relative to the configured root, not absolute.'
+        pieces = [piece for piece in normalized.split('/') if piece not in ('', '.')]
+        if any(piece == '..' for piece in pieces):
+            return root, None, 'Filesystem path must stay inside the configured root.'
+        target = (root.joinpath(*pieces)).resolve()
+    try:
+        target.relative_to(root)
+    except Exception:
+        return root, None, 'Filesystem path resolved outside the configured root.'
+    if not target.exists():
+        rel = '.' if target == root else str(target)
+        return root, None, f'Filesystem path not found: {rel}'
+    if not allow_directory and target.is_dir():
+        return root, None, 'Expected a file path but got a directory.'
+    return root, target, None
+
+
+def _iter_filesystem_matches(root: Path, pattern: str, *, include_hidden: bool):
+    wanted = str(pattern or '').strip() or '**/*'
+    if wanted.startswith('/'):
+        raise ValueError('Glob pattern must be relative to the configured root.')
+    for candidate in root.glob(wanted):
+        resolved = candidate.resolve()
+        try:
+            relative = resolved.relative_to(root)
+        except Exception:
+            continue
+        if not include_hidden and _is_hidden_relative(relative):
+            continue
+        yield resolved, relative
+
+
+def _looks_binary(blob: bytes) -> bool:
+    if not blob:
+        return False
+    if b'\x00' in blob:
+        return True
+    sample = blob[:4096]
+    nontext = sum(1 for byte in sample if byte < 9 or (13 < byte < 32))
+    return nontext > max(8, len(sample) // 6)
+
+
+def _read_text_file_preview(path: Path, *, max_bytes: int = 200000) -> tuple[str | None, str | None]:
+    try:
+        blob = path.read_bytes()
+    except Exception as exc:
+        return None, f'Failed to read file: {exc}'
+    if _looks_binary(blob):
+        return None, 'Binary or non-text file preview is not supported by this filesystem pass.'
+    preview = blob[:max_bytes]
+    try:
+        text = preview.decode('utf-8')
+    except UnicodeDecodeError:
+        text = preview.decode('utf-8', errors='replace')
+    if len(blob) > max_bytes:
+        text += "\n... (truncated)"
+    return text, None
+
+
+def _read_text_file_for_mutation(path: Path, *, max_bytes: int = 200000) -> tuple[str | None, str | None]:
+    try:
+        blob = path.read_bytes()
+    except Exception as exc:
+        return None, f'Failed to read file: {exc}'
+    if _looks_binary(blob):
+        return None, 'Binary or non-text files are not supported by this text-mutation pass.'
+    if len(blob) > max_bytes:
+        return None, f'File exceeds the configured max_bytes limit ({len(blob)} > {max_bytes}).'
+    try:
+        return blob.decode('utf-8'), None
+    except UnicodeDecodeError:
+        return blob.decode('utf-8', errors='replace'), None
+
+
+def _resolve_filesystem_target_for_write(root_path: str | None, relative_path: str, *, create_dirs: bool, prepare_dirs: bool = False) -> tuple[Path | None, Path | None, str | None]:
+    root, root_error = _resolve_filesystem_root(root_path)
+    if root_error or root is None:
+        return None, None, root_error
+    raw = str(relative_path or '').strip()
+    if not raw:
+        return root, None, 'Filesystem path is required.'
+    normalized = raw.replace('\\', '/')
+    if normalized.startswith('/'):
+        return root, None, 'Filesystem path must be relative to the configured root, not absolute.'
+    pieces = [piece for piece in normalized.split('/') if piece not in ('', '.')]
+    if not pieces or any(piece == '..' for piece in pieces):
+        return root, None, 'Filesystem path must stay inside the configured root.'
+    target = (root.joinpath(*pieces)).resolve()
+    try:
+        target.relative_to(root)
+    except Exception:
+        return root, None, 'Filesystem path resolved outside the configured root.'
+    if target.parent.exists() and not target.parent.is_dir():
+        return root, None, 'Parent path is not a directory under the configured root.'
+    if create_dirs and prepare_dirs:
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+        except Exception as exc:
+            return root, None, f'Failed to prepare parent directory: {exc}'
+    elif not target.parent.exists() and not create_dirs:
+        return root, None, 'Parent directory does not exist under the configured root.'
+    if target.exists() and target.is_dir():
+        return root, None, 'Expected a file path but got a directory.'
+    return root, target, None
+
+
+def _normalize_patch_relative_path(value: str | None) -> tuple[str | None, str | None]:
+    raw = str(value or '').strip()
+    if not raw:
+        return None, 'Patch path is empty.'
+    if raw == '/dev/null':
+        return '/dev/null', None
+    path_token = raw.split('	', 1)[0].strip().split(' ', 1)[0].strip()
+    if path_token.startswith('a/') or path_token.startswith('b/'):
+        path_token = path_token[2:]
+    normalized = path_token.replace('\\', '/')
+    if normalized.startswith('/'):
+        return None, 'Patch paths must stay relative to the configured root.'
+    parts = [part for part in normalized.split('/') if part not in ('', '.')]
+    if not parts or any(part == '..' for part in parts):
+        return None, 'Patch paths must stay inside the configured root.'
+    return '/'.join(parts), None
+
+
+def _parse_unified_patch(patch_text: str) -> tuple[list[dict] | None, str | None]:
+    raw = str(patch_text or '')
+    if not raw.strip():
+        return None, 'Patch text is empty.'
+    lines = raw.splitlines()
+    file_patches: list[dict] = []
+    current_file = None
+    current_hunk = None
+    hunk_re = re.compile(r'^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@')
+
+    def _flush_hunk():
+        nonlocal current_hunk, current_file
+        if current_hunk is not None and current_file is not None:
+            current_file.setdefault('hunks', []).append(current_hunk)
+            current_hunk = None
+
+    def _flush_file():
+        nonlocal current_file
+        _flush_hunk()
+        if current_file is not None:
+            file_patches.append(current_file)
+            current_file = None
+
+    for line in lines:
+        if line.startswith('diff --git '):
+            _flush_file()
+            continue
+        if line.startswith(('index ', 'new file mode ', 'deleted file mode ', 'similarity index ', 'rename from ', 'rename to ')):
+            continue
+        if line.startswith('--- '):
+            _flush_file()
+            old_path, path_error = _normalize_patch_relative_path(line[4:])
+            if path_error:
+                return None, path_error
+            current_file = {'old_path': old_path, 'new_path': None, 'hunks': [], 'no_newline_at_eof': False}
+            continue
+        if line.startswith('+++ '):
+            if current_file is None:
+                return None, 'Unified diff is missing the preceding --- line.'
+            new_path, path_error = _normalize_patch_relative_path(line[4:])
+            if path_error:
+                return None, path_error
+            current_file['new_path'] = new_path
+            continue
+        if line.startswith('@@ '):
+            if current_file is None or current_file.get('new_path') is None:
+                return None, 'Unified diff hunk appeared before ---/+++ headers.'
+            _flush_hunk()
+            match = hunk_re.match(line)
+            if not match:
+                return None, f'Invalid unified diff hunk header: {line}'
+            current_hunk = {
+                'old_start': int(match.group(1)),
+                'old_count': int(match.group(2) or '1'),
+                'new_start': int(match.group(3)),
+                'new_count': int(match.group(4) or '1'),
+                'lines': [],
+            }
+            continue
+        if line == '\\ No newline at end of file':
+            if current_file is not None:
+                current_file['no_newline_at_eof'] = True
+            continue
+        if current_hunk is None:
+            if not line.strip():
+                continue
+            return None, f'Unexpected line outside a unified diff hunk: {line}'
+        if not line:
+            current_hunk['lines'].append((' ', ''))
+            continue
+        marker = line[0]
+        if marker not in {' ', '+', '-'}:
+            return None, f'Unsupported unified diff line: {line}'
+        current_hunk['lines'].append((marker, line[1:]))
+
+    _flush_file()
+    if not file_patches:
+        return None, 'No unified diff file patches were found.'
+    for file_patch in file_patches:
+        if file_patch.get('new_path') is None:
+            return None, 'Unified diff file patch is missing a +++ target path.'
+        if not file_patch.get('hunks'):
+            return None, 'Unified diff file patch has no hunks.'
+    return file_patches, None
+
+
+def _apply_unified_patch_to_text(original_text: str, file_patch: dict, *, creating: bool) -> tuple[str | None, str | None]:
+    current_lines = str(original_text or '').splitlines()
+    had_trailing_newline = bool(original_text) and str(original_text).endswith('\n')
+    output_lines: list[str] = []
+    cursor = 0
+    for hunk in file_patch.get('hunks', []) or []:
+        start = max(int(hunk.get('old_start', 1)) - 1, 0)
+        if start < cursor or start > len(current_lines):
+            return None, f'Patch hunk start {start + 1} is outside the target file.'
+        output_lines.extend(current_lines[cursor:start])
+        idx = start
+        for marker, line_text in hunk.get('lines', []) or []:
+            if marker == ' ':
+                if idx >= len(current_lines) or current_lines[idx] != line_text:
+                    return None, f'Patch context mismatch near line {idx + 1}.'
+                output_lines.append(current_lines[idx])
+                idx += 1
+            elif marker == '-':
+                if idx >= len(current_lines) or current_lines[idx] != line_text:
+                    return None, f'Patch removal mismatch near line {idx + 1}.'
+                idx += 1
+            elif marker == '+':
+                output_lines.append(line_text)
+        cursor = idx
+    output_lines.extend(current_lines[cursor:])
+    new_text = '\n'.join(output_lines)
+    keep_trailing_newline = (creating and bool(output_lines)) or had_trailing_newline
+    if file_patch.get('no_newline_at_eof'):
+        keep_trailing_newline = False
+    if keep_trailing_newline and new_text:
+        new_text += '\n'
+    return new_text, None
+
+
+def _summarize_unified_patch(file_patch: dict) -> dict:
+    additions = 0
+    deletions = 0
+    for hunk in file_patch.get('hunks', []) or []:
+        for marker, _ in hunk.get('lines', []) or []:
+            if marker == '+':
+                additions += 1
+            elif marker == '-':
+                deletions += 1
+    return {
+        'hunks': len(file_patch.get('hunks', []) or []),
+        'additions': additions,
+        'deletions': deletions,
+    }
+
+
+def _filesystem_relative_path(root: Path | None, target: Path | None) -> str | None:
+    if root is None or target is None:
+        return None
+    try:
+        return str(target.relative_to(root)).replace('\\', '/')
+    except Exception:
+        return None
+
+
+def _blocking_reason(reason_code: str, message: str, **extra) -> dict:
+    payload = {'reason_code': reason_code, 'message': message}
+    payload.update({key: value for key, value in extra.items() if value is not None})
+    return payload
+
+
+def _tool_payload_json(toolkit: str, operation: str, status: str, **payload) -> str:
+    envelope = {'toolkit': toolkit, 'operation': operation, 'status': status}
+    envelope.update({key: value for key, value in payload.items() if value is not None})
+    return json.dumps(envelope, ensure_ascii=False, default=str)
+
+
+def _normalize_mutation_mode(mode: str | None) -> tuple[str | None, str | None]:
+    normalized = str(mode or 'preview').strip().lower() or 'preview'
+    if normalized not in {'preview', 'apply'}:
+        return None, "Mode must be 'preview' or 'apply'."
+    return normalized, None
+
+
+def _filesystem_reason_code(message: str | None, *, missing_code: str = 'target_missing') -> str:
+    normalized = str(message or '').lower()
+    if 'outside the configured root' in normalized or 'must stay inside the configured root' in normalized or 'not absolute' in normalized:
+        return 'root_escape_attempt'
+    if 'not found' in normalized:
+        return missing_code
+    if 'exceeds max_bytes' in normalized or 'file exceeds the configured max_bytes limit' in normalized:
+        return 'file_too_large'
+    if 'already exists and overwrite_existing=false' in normalized:
+        return 'overwrite_not_allowed'
+    if 'already exists for create patch' in normalized:
+        return 'target_already_exists'
+    if 'file creation is disabled' in normalized:
+        return 'patch_creation_not_allowed'
+    if 'find_text was not found' in normalized:
+        return 'edit_match_missing'
+    if 'unified diff' in normalized or 'patch text is empty' in normalized or 'unsupported unified diff line' in normalized or 'unexpected line outside a unified diff hunk' in normalized:
+        return 'invalid_patch'
+    if 'binary or non-text' in normalized:
+        return 'binary_file_not_supported'
+    if 'path is required' in normalized or 'expected a file path but got a directory' in normalized or 'filesystem root' in normalized or 'parent directory does not exist' in normalized or 'parent path is not a directory' in normalized:
+        return 'invalid_path'
+    return 'blocked'
+
+
+def _build_shell_env() -> dict[str, str]:
+    allowed = ('PATH', 'HOME', 'USER', 'USERNAME', 'TMP', 'TEMP', 'SYSTEMROOT', 'COMSPEC', 'PATHEXT', 'WINDIR')
+    return {key: os.environ[key] for key in allowed if key in os.environ}
+
+
+def _normalize_allowed_commands(value) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    rows = []
+    for item in value:
+        normalized = str(item or '').strip()
+        if normalized:
+            rows.append(Path(normalized).name.lower())
+    return rows
+
+
+def _normalize_shell_command(command: str) -> tuple[list[str] | None, str | None]:
+    raw = str(command or '').strip()
+    if not raw:
+        return None, 'Shell command is empty.'
+    try:
+        argv = shlex.split(raw, posix=(os.name != 'nt'))
+    except Exception as exc:
+        return None, f'Unable to parse shell command: {exc}'
+    if not argv:
+        return None, 'Shell command is empty.'
+    head = str(argv[0] or '').strip()
+    if not head:
+        return None, 'Shell command executable is empty.'
+    if '/' in head or '\\' in head:
+        return None, 'Executable must be a bare command name from the allowlist, not a path.'
+    argv[0] = Path(head).name
+    return argv, None
+
+
+def _normalize_repo_relative_path(path: str) -> tuple[str | None, str | None]:
+    raw = str(path or '').strip()
+    if not raw:
+        return None, 'GitHub file path is empty.'
+    normalized = raw.replace('\\', '/')
+    if normalized.startswith('/'):
+        return None, 'GitHub file path must be repository-relative, not absolute.'
+    parts = [part for part in normalized.split('/') if part not in ('', '.')]
+    if not parts or any(part == '..' for part in parts):
+        return None, 'GitHub file path must stay inside the configured repository.'
+    return '/'.join(parts), None
+
+
+def _is_valid_github_repository(value: str) -> bool:
+    return bool(re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', str(value or '').strip()))
+
+
+{% if has_github %}
+_github_toolkit_cache = {}
+
+
+def _load_github_tool(tool_name: str):
+    target = str(tool_name or '').strip().lower()
+    if not target:
+        return None
+    cache_key = 'default'
+    if cache_key not in _github_toolkit_cache:
+        from langchain_community.agent_toolkits.github.toolkit import GitHubToolkit
+        from langchain_community.utilities.github import GitHubAPIWrapper
+
+        repository = str(os.getenv('GITHUB_REPOSITORY') or '').strip()
+        if not _is_valid_github_repository(repository):
+            raise ValueError(f"GITHUB_REPOSITORY must use owner/repo format; got '{repository or '<empty>'}'.")
+
+        wrapper = GitHubAPIWrapper()
+        toolkit = GitHubToolkit.from_github_api_wrapper(wrapper)
+        _github_toolkit_cache[cache_key] = toolkit.get_tools()
+    for candidate in _github_toolkit_cache[cache_key]:
+        name = str(getattr(candidate, 'name', '') or '').strip().lower()
+        if name == target or target in name or name in target:
+            return candidate
+    return None
+
+
+def _invoke_sync_tool(tool_obj, payload, fallback=None):
+    try:
+        return tool_obj.invoke(payload)
+    except Exception:
+        if fallback is None:
+            raise
+        return tool_obj.invoke(fallback)
+
+
+{% endif %}
+
+
+
+
+def _parse_json_object_arg(value: str | None, *, label: str, default=None) -> tuple[dict, str | None]:
+    if value is None:
+        return (default or {}), None
+    raw = str(value).strip()
+    if not raw:
+        return (default or {}), None
+    try:
+        parsed = json.loads(raw)
+    except Exception as exc:
+        return {}, f"{label} must be valid JSON: {exc}"
+    if not isinstance(parsed, dict):
+        return {}, f"{label} must decode to a JSON object."
+    return parsed, None
+
+
+def _normalize_timeout(value, default: int = 10) -> int:
+    try:
+        parsed = int(value)
+    except Exception:
+        return default
+    if parsed <= 0:
+        return default
+    return min(parsed, 120)
+
+
+def _resolve_requests_target(base_url: str | None, path_or_url: str, *, allow_full_urls: bool) -> tuple[str | None, str | None]:
+    raw_target = str(path_or_url or '').strip()
+    if not raw_target:
+        return None, 'HTTP target is required.'
+    parsed = urlparse(raw_target)
+    if parsed.scheme and parsed.netloc:
+        if allow_full_urls:
+            return raw_target, None
+        return None, 'Full URLs are blocked for this Requests surface; provide a relative path or enable allow_full_urls.'
+    base = str(base_url or '').strip()
+    if not base:
+        return None, 'Requests surface needs a base_url when full URLs are not allowed.'
+    if not urlparse(base).scheme:
+        return None, 'Requests base_url must include http:// or https://.'
+    return urljoin(base.rstrip('/') + '/', raw_target.lstrip('/')), None
+
+
+def _requests_preview_payload(response) -> dict:
+    try:
+        body = response.json()
+    except Exception:
+        body = response.text
+    preview, truncated = _truncate_text(body, max_chars=3000)
+    return {
+        'status_code': getattr(response, 'status_code', None),
+        'content_type': response.headers.get('Content-Type', ''),
+        'body_preview': preview,
+        'truncated': truncated,
+    }
+
+
+def _extract_brave_web_results(payload) -> list[dict]:
+    if not isinstance(payload, dict):
+        return []
+    web_section = payload.get('web') if isinstance(payload.get('web'), dict) else {}
+    rows = web_section.get('results') if isinstance(web_section, dict) else []
+    normalized = []
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+        normalized.append({
+            'title': row.get('title'),
+            'url': row.get('url') or row.get('profile', {}).get('url') if isinstance(row.get('profile'), dict) else row.get('url'),
+            'snippet': row.get('description') or row.get('extra_snippets') or row.get('meta_description'),
+        })
+    return normalized
+
+{% for t in tools %}
+# ==========================================
+# TOOL : {{ t.id }}
+# ==========================================
+{% if t.type == 'python_function' %}
+_PYTHON_TOOL_SOURCE_{{ loop.index0 }} = {{ t.code | tojson }}
+_PYTHON_TOOL_AST_{{ loop.index0 }} = ast.parse(_PYTHON_TOOL_SOURCE_{{ loop.index0 }})
+_PYTHON_TOOL_NAMES_{{ loop.index0 }} = [
+    node.name
+    for node in _PYTHON_TOOL_AST_{{ loop.index0 }}.body
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+]
+if not _PYTHON_TOOL_NAMES_{{ loop.index0 }}:
+    raise ValueError("Le code du tool {{ t.id }} doit définir au moins une fonction.")
+_PYTHON_TOOL_NS_{{ loop.index0 }} = {}
+exec(_PYTHON_TOOL_SOURCE_{{ loop.index0 }}, {"tool": tool}, _PYTHON_TOOL_NS_{{ loop.index0 }})
+{{ t.id }} = _PYTHON_TOOL_NS_{{ loop.index0 }}[_PYTHON_TOOL_NAMES_{{ loop.index0 }}[-1]]
+if not hasattr({{ t.id }}, "invoke"):
+    {{ t.id }} = tool("{{ t.id }}")({{ t.id }})
+else:
+    try:
+        {{ t.id }}.name = "{{ t.id }}"
+    except Exception:
+        pass
+
+{% elif t.type == 'python_repl' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(code: str) -> str:
+{% else %}
+def {{ t.id }}(code: str) -> str:
+{% endif %}
+    """{{ t.description | default("Exécute du code Python pour faire des calculs complexes ou traiter des données.", true) }}"""
+    from langchain_experimental.utilities import PythonREPL
+    
+    repl = PythonREPL()
+    try:
+        result = repl.run(code)
+        return f"Exécuté avec succès. Sortie : \n{result}"
+    except Exception as e:
+        return f"Erreur lors de l'exécution du code : {str(e)}"
+
+{% elif t.type == 'rest_api' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(payload: dict) -> str:
+{% else %}
+def {{ t.id }}(payload: dict) -> str:
+{% endif %}
+    """{{ t.description | default("Appel API REST généré dynamiquement", true) }}"""
+    try:
+        response = requests.request(
+            method="{{ t.params.method | default('POST', true) }}",
+            url="{{ t.params.url }}",
+            json=payload,
+            headers={{ t.params.headers | default({}) }}
+        )
+        response.raise_for_status()
+        return response.text
+    except Exception as e:
+        return f"Erreur de l'outil API : {str(e)}"
+
+{% elif t.type == 'api_call' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(payload: dict) -> str:
+{% else %}
+def {{ t.id }}(payload: dict) -> str:
+{% endif %}
+    """{{ t.description | default("Effectue une requête HTTP POST vers l'endpoint configuré.", true) }}"""
+    import requests
+    url = "{{ t.params.url }}"
+    headers = {{ t.params.headers | default({}) }}
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
+        response.raise_for_status()
+        return f"Succès : {response.json()}"
+    except Exception as e:
+        return f"Erreur API : {str(e)}"
+
+
+{% elif t.type == 'fs_list_dir' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(relative_path: str = "") -> str:
+{% else %}
+def {{ t.id }}(relative_path: str = "") -> str:
+{% endif %}
+    """{{ t.description | default("Read-only local filesystem listing from a bounded root path.", true) }}"""
+    root, target, target_error = _resolve_filesystem_target({{ t.params.root_path | default('.', true) | tojson }}, relative_path, allow_directory=True)
+    if target_error:
+        return f"Filesystem list blocked: {target_error}"
+    if target is None:
+        return "Filesystem list blocked: unable to resolve target directory."
+    if not target.is_dir():
+        return "Filesystem list blocked: target path is not a directory."
+    include_hidden = _coerce_bool({{ 'True' if t.params.include_hidden and t.params.include_hidden != 'false' else 'False' }}, default=False)
+    max_results = int({{ t.params.max_results | default(100, true) }})
+    rows = []
+    for child in sorted(target.iterdir(), key=lambda item: (not item.is_dir(), item.name.lower())):
+        try:
+            rel = child.resolve().relative_to(root)
+        except Exception:
+            continue
+        if not include_hidden and _is_hidden_relative(rel):
+            continue
+        entry = {
+            'path': str(rel).replace('\\', '/'),
+            'name': child.name,
+            'kind': 'directory' if child.is_dir() else 'file',
+        }
+        if child.is_file():
+            try:
+                entry['size_bytes'] = child.stat().st_size
+            except Exception:
+                pass
+        rows.append(entry)
+        if len(rows) >= max_results:
+            break
+    current_rel = '.' if target == root else str(target.relative_to(root)).replace('\\', '/')
+    return json.dumps({'toolkit': 'filesystem', 'operation': 'list_dir', 'root': str(root), 'path': current_rel, 'entries': rows, 'count': len(rows)}, ensure_ascii=False, default=str)
+
+{% elif t.type == 'fs_read_file' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(relative_path: str) -> str:
+{% else %}
+def {{ t.id }}(relative_path: str) -> str:
+{% endif %}
+    """{{ t.description | default("Read one local text file from a bounded root path.", true) }}"""
+    root, target, target_error = _resolve_filesystem_target({{ t.params.root_path | default('.', true) | tojson }}, relative_path, allow_directory=False)
+    if target_error:
+        return f"Filesystem read blocked: {target_error}"
+    if target is None:
+        return "Filesystem read blocked: unable to resolve file."
+    max_bytes = int({{ t.params.max_bytes | default(200000, true) }})
+    text_preview, read_error = _read_text_file_preview(target, max_bytes=max_bytes)
+    if read_error:
+        return f"Filesystem read blocked: {read_error}"
+    relative = str(target.relative_to(root)).replace('\\', '/')
+    payload = {'toolkit': 'filesystem', 'operation': 'read_file', 'root': str(root), 'path': relative, 'content': text_preview}
+    return json.dumps(payload, ensure_ascii=False, default=str)
+
+{% elif t.type == 'fs_glob' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(pattern: str = "**/*") -> str:
+{% else %}
+def {{ t.id }}(pattern: str = "**/*") -> str:
+{% endif %}
+    """{{ t.description | default("Read-only glob search across a bounded local filesystem root.", true) }}"""
+    root, root_error = _resolve_filesystem_root({{ t.params.root_path | default('.', true) | tojson }})
+    if root_error or root is None:
+        return f"Filesystem glob blocked: {root_error}"
+    include_hidden = _coerce_bool({{ 'True' if t.params.include_hidden and t.params.include_hidden != 'false' else 'False' }}, default=False)
+    max_results = int({{ t.params.max_results | default(200, true) }})
+    wanted_pattern = str(pattern or '').strip() or '**/*'
+    try:
+        matches = []
+        for candidate, relative in _iter_filesystem_matches(root, wanted_pattern, include_hidden=include_hidden):
+            matches.append({
+                'path': str(relative).replace('\\', '/'),
+                'kind': 'directory' if candidate.is_dir() else 'file',
+            })
+            if len(matches) >= max_results:
+                break
+        return json.dumps({'toolkit': 'filesystem', 'operation': 'glob', 'root': str(root), 'pattern': wanted_pattern, 'matches': matches, 'count': len(matches)}, ensure_ascii=False, default=str)
+    except Exception as exc:
+        return f"Filesystem glob error: {exc}"
+
+{% elif t.type == 'fs_grep' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(pattern: str) -> str:
+{% else %}
+def {{ t.id }}(pattern: str) -> str:
+{% endif %}
+    """{{ t.description | default("Read-only grep-style text search across a bounded local filesystem root.", true) }}"""
+    root, root_error = _resolve_filesystem_root({{ t.params.root_path | default('.', true) | tojson }})
+    if root_error or root is None:
+        return f"Filesystem grep blocked: {root_error}"
+    wanted_pattern = str(pattern or '').strip()
+    if not wanted_pattern:
+        return 'Filesystem grep pattern is empty.'
+    include_hidden = _coerce_bool({{ 'True' if t.params.include_hidden and t.params.include_hidden != 'false' else 'False' }}, default=False)
+    case_sensitive = _coerce_bool({{ 'True' if t.params.case_sensitive and t.params.case_sensitive != 'false' else 'False' }}, default=False)
+    max_matches = int({{ t.params.max_matches | default(200, true) }})
+    file_glob = {{ t.params.file_glob | default('**/*', true) | tojson }}
+    try:
+        regex = re.compile(wanted_pattern, 0 if case_sensitive else re.IGNORECASE)
+    except Exception as exc:
+        return f"Filesystem grep blocked: invalid regex pattern ({exc})."
+    matches = []
+    try:
+        for candidate, relative in _iter_filesystem_matches(root, file_glob, include_hidden=include_hidden):
+            if not candidate.is_file():
+                continue
+            try:
+                if candidate.stat().st_size > 2_000_000:
+                    continue
+            except Exception:
+                continue
+            text_preview, read_error = _read_text_file_preview(candidate, max_bytes=500000)
+            if read_error or text_preview is None:
+                continue
+            for line_number, line in enumerate(text_preview.splitlines(), start=1):
+                if regex.search(line):
+                    matches.append({
+                        'path': str(relative).replace('\\', '/'),
+                        'line_number': line_number,
+                        'line': line[:500],
+                    })
+                    if len(matches) >= max_matches:
+                        return json.dumps({'toolkit': 'filesystem', 'operation': 'grep', 'root': str(root), 'pattern': wanted_pattern, 'file_glob': file_glob, 'matches': matches, 'count': len(matches)}, ensure_ascii=False, default=str)
+        return json.dumps({'toolkit': 'filesystem', 'operation': 'grep', 'root': str(root), 'pattern': wanted_pattern, 'file_glob': file_glob, 'matches': matches, 'count': len(matches)}, ensure_ascii=False, default=str)
+    except Exception as exc:
+        return f"Filesystem grep error: {exc}"
+
+
+{% elif t.type == 'fs_write_file' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(relative_path: str, content: str, mode: str = 'preview') -> str:
+{% else %}
+def {{ t.id }}(relative_path: str, content: str, mode: str = 'preview') -> str:
+{% endif %}
+    """{{ t.description | default("Preview or apply one local text-file write under a bounded root path with explicit overwrite and size guards.", true) }}"""
+    requested_mode = mode
+    mode, mode_error = _normalize_mutation_mode(mode)
+    create_dirs = _coerce_bool({{ 'True' if t.params.create_dirs and t.params.create_dirs != 'false' else 'False' }}, default=False)
+    overwrite_existing = _coerce_bool({{ 'True' if t.params.overwrite_existing and t.params.overwrite_existing != 'false' else 'False' }}, default=False)
+    max_bytes = int({{ t.params.max_bytes | default(200000, true) }})
+    body = str(content or '')
+    body_bytes = body.encode('utf-8')
+    if mode_error:
+        reason = _blocking_reason('invalid_mode', mode_error, requested_mode=str(requested_mode or ''), requested_path=str(relative_path or ''))
+        return _tool_payload_json('filesystem', 'write_file', 'blocked', mode='preview', requested_mode=str(requested_mode or ''), requested_path=str(relative_path or ''), reason_code='invalid_mode', message=mode_error, blocking_reasons=[reason])
+    root, target, target_error = _resolve_filesystem_target_for_write({{ t.params.root_path | default('.', true) | tojson }}, relative_path, create_dirs=create_dirs, prepare_dirs=(mode == 'apply'))
+    root_value = str(root) if root is not None else None
+    resolved_path = _filesystem_relative_path(root, target) if root is not None and target is not None else None
+    existed = bool(target is not None and target.exists())
+    payload_base = {
+        'mode': mode,
+        'root': root_value,
+        'path': resolved_path or str(relative_path or ''),
+        'requested_path': str(relative_path or ''),
+        'exists': existed,
+        'would_create': not existed,
+        'would_overwrite': existed,
+        'size_estimate_bytes': len(body_bytes),
+        'overwrite_existing': overwrite_existing,
+        'create_dirs': create_dirs,
+        'would_create_dirs': bool(target is not None and create_dirs and not target.parent.exists()),
+    }
+    if target_error:
+        reason_code = _filesystem_reason_code(target_error, missing_code='target_missing')
+        reason = _blocking_reason(reason_code, target_error, path=payload_base['path'])
+        return _tool_payload_json('filesystem', 'write_file', 'blocked', reason_code=reason_code, message=target_error, blocking_reasons=[reason], **payload_base)
+    if target is None:
+        message = 'Unable to resolve target file for write.'
+        reason = _blocking_reason('invalid_path', message, path=payload_base['path'])
+        return _tool_payload_json('filesystem', 'write_file', 'blocked', reason_code='invalid_path', message=message, blocking_reasons=[reason], **payload_base)
+    if len(body_bytes) > max_bytes:
+        message = f"Content exceeds max_bytes ({len(body_bytes)} > {max_bytes})."
+        reason = _blocking_reason('file_too_large', message, path=payload_base['path'])
+        return _tool_payload_json('filesystem', 'write_file', 'blocked', reason_code='file_too_large', message=message, blocking_reasons=[reason], **payload_base)
+    if existed and not overwrite_existing:
+        message = 'Target file already exists and overwrite_existing=false.'
+        reason = _blocking_reason('overwrite_not_allowed', message, path=payload_base['path'])
+        return _tool_payload_json('filesystem', 'write_file', 'blocked', reason_code='overwrite_not_allowed', message=message, blocking_reasons=[reason], **payload_base)
+    if mode == 'preview':
+        return _tool_payload_json('filesystem', 'write_file', 'preview', review_required=True, **payload_base)
+    try:
+        target.write_text(body, encoding='utf-8')
+    except Exception as exc:
+        message = f'Failed to write target file: {exc}'
+        return _tool_payload_json('filesystem', 'write_file', 'failed', reason_code='write_failed', message=message, **payload_base)
+    return _tool_payload_json('filesystem', 'write_file', 'applied', bytes_written=len(body_bytes), created=not existed, overwrote=existed, **payload_base)
+
+{% elif t.type == 'fs_edit_file' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(relative_path: str, find_text: str, replace_with: str, mode: str = 'preview') -> str:
+{% else %}
+def {{ t.id }}(relative_path: str, find_text: str, replace_with: str, mode: str = 'preview') -> str:
+{% endif %}
+    """{{ t.description | default("Preview or apply one bounded local text-file edit with explicit match and size guards.", true) }}"""
+    requested_mode = mode
+    mode, mode_error = _normalize_mutation_mode(mode)
+    max_bytes = int({{ t.params.max_bytes | default(200000, true) }})
+    replace_all = _coerce_bool({{ 'True' if t.params.replace_all and t.params.replace_all != 'false' else 'False' }}, default=False)
+    replacement_mode = 'all' if replace_all else 'single'
+    payload_base = {
+        'mode': mode or 'preview',
+        'requested_mode': str(requested_mode or ''),
+        'requested_path': str(relative_path or ''),
+        'replace_all': replace_all,
+        'replacement_mode': replacement_mode,
+    }
+    if mode_error:
+        reason = _blocking_reason('invalid_mode', mode_error, path=payload_base['requested_path'])
+        return _tool_payload_json('filesystem', 'edit_file', 'blocked', reason_code='invalid_mode', message=mode_error, blocking_reasons=[reason], **payload_base)
+    if not str(find_text or ''):
+        message = 'find_text must not be empty.'
+        reason = _blocking_reason('missing_find_text', message, path=payload_base['requested_path'])
+        return _tool_payload_json('filesystem', 'edit_file', 'blocked', reason_code='missing_find_text', message=message, blocking_reasons=[reason], **payload_base)
+    root, target, target_error = _resolve_filesystem_target({{ t.params.root_path | default('.', true) | tojson }}, relative_path, allow_directory=False)
+    payload_base['root'] = str(root) if root is not None else None
+    payload_base['path'] = _filesystem_relative_path(root, target) if root is not None and target is not None else payload_base['requested_path']
+    if target_error:
+        reason_code = _filesystem_reason_code(target_error, missing_code='target_missing')
+        reason = _blocking_reason(reason_code, target_error, path=payload_base['path'])
+        return _tool_payload_json('filesystem', 'edit_file', 'blocked', reason_code=reason_code, message=target_error, blocking_reasons=[reason], **payload_base)
+    if target is None:
+        message = 'Unable to resolve target file for edit.'
+        reason = _blocking_reason('invalid_path', message, path=payload_base['path'])
+        return _tool_payload_json('filesystem', 'edit_file', 'blocked', reason_code='invalid_path', message=message, blocking_reasons=[reason], **payload_base)
+    text_value, read_error = _read_text_file_for_mutation(target, max_bytes=max_bytes)
+    if read_error or text_value is None:
+        reason_code = _filesystem_reason_code(read_error or 'Failed to read target file for edit.')
+        reason = _blocking_reason(reason_code, read_error or 'Failed to read target file for edit.', path=payload_base['path'])
+        return _tool_payload_json('filesystem', 'edit_file', 'blocked', reason_code=reason_code, message=read_error or 'Failed to read target file for edit.', blocking_reasons=[reason], **payload_base)
+    occurrences = text_value.count(find_text)
+    replacement_count = occurrences if replace_all else (1 if occurrences > 0 else 0)
+    payload_base['matches_found'] = occurrences
+    payload_base['replacements_planned'] = replacement_count
+    if occurrences <= 0:
+        message = 'find_text was not found in the target file.'
+        reason = _blocking_reason('edit_match_missing', message, path=payload_base['path'])
+        return _tool_payload_json('filesystem', 'edit_file', 'blocked', reason_code='edit_match_missing', message=message, blocking_reasons=[reason], **payload_base)
+    updated = text_value.replace(find_text, str(replace_with or ''), replacement_count)
+    if mode == 'preview':
+        return _tool_payload_json('filesystem', 'edit_file', 'preview', review_required=True, **payload_base)
+    try:
+        target.write_text(updated, encoding='utf-8')
+    except Exception as exc:
+        message = f'Failed to write edited file: {exc}'
+        return _tool_payload_json('filesystem', 'edit_file', 'failed', reason_code='write_failed', message=message, **payload_base)
+    return _tool_payload_json('filesystem', 'edit_file', 'applied', replacements_applied=replacement_count, **payload_base)
+
+{% elif t.type == 'fs_apply_patch' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(patch: str, mode: str = 'preview') -> str:
+{% else %}
+def {{ t.id }}(patch: str, mode: str = 'preview') -> str:
+{% endif %}
+    """{{ t.description | default("Preview or apply one bounded unified diff patch under a local root path with explicit file-count, size, and creation guards.", true) }}"""
+    requested_mode = mode
+    mode, mode_error = _normalize_mutation_mode(mode)
+    allow_create = _coerce_bool({{ 'True' if t.params.allow_create and t.params.allow_create != 'false' else 'False' }}, default=False)
+    create_dirs = _coerce_bool({{ 'True' if t.params.create_dirs and t.params.create_dirs != 'false' else 'False' }}, default=False)
+    max_files = int({{ t.params.max_files | default(8, true) }})
+    max_bytes = int({{ t.params.max_bytes | default(200000, true) }})
+    configured_root = {{ t.params.root_path | default('.', true) | tojson }}
+    resolved_root, root_error = _resolve_filesystem_root(configured_root)
+    root_value = str(resolved_root) if resolved_root is not None else None
+    if mode_error:
+        reason = _blocking_reason('invalid_mode', mode_error, requested_mode=str(requested_mode or ''))
+        return _tool_payload_json('filesystem', 'apply_patch', 'blocked', mode='preview', requested_mode=str(requested_mode or ''), reason_code='invalid_mode', message=mode_error, blocking_reasons=[reason], files_to_modify=[], files_to_create=[], files_rejected=[])
+    if root_error:
+        reason = _blocking_reason('invalid_path', root_error)
+        return _tool_payload_json('filesystem', 'apply_patch', 'blocked', mode=mode, root=root_value, reason_code='invalid_path', message=root_error, blocking_reasons=[reason], files_to_modify=[], files_to_create=[], files_rejected=[])
+    file_patches, patch_error = _parse_unified_patch(patch)
+    if patch_error or file_patches is None:
+        message = patch_error or 'Patch text could not be parsed.'
+        reason_code = _filesystem_reason_code(message)
+        if reason_code == 'blocked':
+            reason_code = 'invalid_patch'
+        reason = _blocking_reason(reason_code, message)
+        return _tool_payload_json('filesystem', 'apply_patch', 'blocked', mode=mode, root=root_value, reason_code=reason_code, message=message, blocking_reasons=[reason], files_to_modify=[], files_to_create=[], files_rejected=[])
+    if len(file_patches) > max_files:
+        message = f"Patch touches {len(file_patches)} files which exceeds max_files ({max_files})."
+        reason = _blocking_reason('too_many_files_in_patch', message)
+        return _tool_payload_json('filesystem', 'apply_patch', 'blocked', mode=mode, root=root_value, reason_code='too_many_files_in_patch', message=message, blocking_reasons=[reason], files_touched=len(file_patches), files_to_modify=[], files_to_create=[], files_rejected=[])
+
+    preview_files = []
+    files_to_modify = []
+    files_to_create = []
+    files_rejected = []
+    blocking_reasons = []
+    prepared_writes = []
+
+    for file_patch in file_patches:
+        old_path = file_patch.get('old_path')
+        new_path = file_patch.get('new_path')
+        target_relative = new_path if new_path != '/dev/null' else old_path
+        creating = old_path == '/dev/null'
+        action = 'create' if creating else 'modify'
+        summary = _summarize_unified_patch(file_patch)
+        preview_entry = {
+            **summary,
+            'old_path': old_path,
+            'new_path': new_path,
+            'path': target_relative,
+            'created': creating,
+            'action': action,
+        }
+
+        def reject(reason_code: str, message: str):
+            reason = _blocking_reason(reason_code, message, path=target_relative)
+            entry = dict(preview_entry)
+            entry.update({'status': 'rejected', 'reason_code': reason_code, 'message': message})
+            preview_files.append(entry)
+            files_rejected.append(entry)
+            blocking_reasons.append(reason)
+
+        if new_path == '/dev/null':
+            reject('patch_delete_not_supported', 'File deletion is not supported by this patch pass.')
+            continue
+        if old_path not in {None, '/dev/null'} and new_path not in {None, '/dev/null'} and old_path != new_path:
+            reject('patch_rename_not_supported', f"Path rename '{old_path}' -> '{new_path}' is not supported by this patch pass.")
+            continue
+        if not target_relative or target_relative == '/dev/null':
+            reject('invalid_patch', 'Target file path is missing from the patch.')
+            continue
+
+        if creating:
+            if not allow_create:
+                reject('patch_creation_not_allowed', f"File creation is disabled for '{target_relative}'.")
+                continue
+            root, target, target_error = _resolve_filesystem_target_for_write(configured_root, target_relative, create_dirs=create_dirs, prepare_dirs=False)
+            if target_error:
+                reject(_filesystem_reason_code(target_error), target_error)
+                continue
+            if target is None or root is None:
+                reject('invalid_path', 'Unable to resolve patch target file.')
+                continue
+            if target.exists():
+                reject('target_already_exists', f"Target file already exists for create patch '{target_relative}'.")
+                continue
+            original_text = ''
+        else:
+            root, target, target_error = _resolve_filesystem_target(configured_root, target_relative, allow_directory=False)
+            if target_error:
+                reject(_filesystem_reason_code(target_error, missing_code='target_missing'), target_error)
+                continue
+            if target is None or root is None:
+                reject('invalid_path', 'Unable to resolve patch target file.')
+                continue
+            original_text, read_error = _read_text_file_for_mutation(target, max_bytes=max_bytes)
+            if read_error or original_text is None:
+                reject(_filesystem_reason_code(read_error), read_error or 'Failed to read patch target file.')
+                continue
+
+        updated_text, apply_error = _apply_unified_patch_to_text(original_text, file_patch, creating=creating)
+        if apply_error or updated_text is None:
+            reject('invalid_patch', apply_error or 'Patch could not be applied in memory.')
+            continue
+
+        body_bytes = updated_text.encode('utf-8')
+        if len(body_bytes) > max_bytes:
+            reject('file_too_large', f"Patched content for '{target_relative}' exceeds max_bytes ({len(body_bytes)} > {max_bytes}).")
+            continue
+
+        relative = _filesystem_relative_path(root, target)
+        entry = dict(preview_entry)
+        entry.update({
+            'path': relative or target_relative,
+            'status': 'would_create' if creating else 'would_modify',
+            'size_estimate_bytes': len(body_bytes),
+            'would_create_dirs': bool(target is not None and create_dirs and not target.parent.exists()),
+        })
+        preview_files.append(entry)
+        if creating:
+            files_to_create.append(entry)
+        else:
+            files_to_modify.append(entry)
+        prepared_writes.append({'root': root, 'target': target, 'updated_text': updated_text, 'summary': entry})
+
+    preview_payload = {
+        'mode': mode,
+        'root': root_value,
+        'files_touched': len(file_patches),
+        'files_changed': len(prepared_writes),
+        'files': preview_files,
+        'files_to_modify': files_to_modify,
+        'files_to_create': files_to_create,
+        'files_rejected': files_rejected,
+        'blocking_reasons': blocking_reasons,
+        'allow_create': allow_create,
+        'create_dirs': create_dirs,
+    }
+    if blocking_reasons:
+        first_reason = blocking_reasons[0]
+        return _tool_payload_json('filesystem', 'apply_patch', 'blocked', reason_code=first_reason.get('reason_code'), message=first_reason.get('message'), **preview_payload)
+    if mode == 'preview':
+        return _tool_payload_json('filesystem', 'apply_patch', 'preview', review_required=True, **preview_payload)
+
+    applied = []
+    for prepared in prepared_writes:
+        target = prepared['target']
+        summary = dict(prepared['summary'])
+        try:
+            if summary.get('created') and create_dirs:
+                target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(prepared['updated_text'], encoding='utf-8')
+        except Exception as exc:
+            message = f"Failed to write patch target '{summary.get('path') or summary.get('new_path') or summary.get('old_path')}': {exc}"
+            status = 'partially_applied' if applied else 'failed'
+            summary.update({'status': 'failed', 'reason_code': 'write_failed', 'message': message})
+            return _tool_payload_json('filesystem', 'apply_patch', status, mode='apply', root=root_value, reason_code='write_failed', message=message, files_changed=len(applied), files=applied + [summary], files_to_modify=files_to_modify, files_to_create=files_to_create, files_rejected=files_rejected, blocking_reasons=[_blocking_reason('write_failed', message, path=summary.get('path'))])
+        summary['status'] = 'applied'
+        applied.append(summary)
+
+    return _tool_payload_json('filesystem', 'apply_patch', 'applied', mode='apply', root=root_value, files_touched=len(file_patches), files_changed=len(applied), files=applied, files_to_modify=files_to_modify, files_to_create=files_to_create, files_rejected=files_rejected, allow_create=allow_create, create_dirs=create_dirs)
+
+
+
+{% elif t.type == 'shell_command' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(command: str) -> str:
+{% else %}
+def {{ t.id }}(command: str) -> str:
+{% endif %}
+    """{{ t.description | default("User-armed bounded local shell subprocess surface with cwd and command allowlist guards.", true) }}"""
+    timeout_seconds = int({{ t.params.timeout_seconds | default(20, true) }})
+    allowed_commands = _normalize_allowed_commands({{ t.params.allowed_commands | default([], true) | tojson }})
+    configured_root = {{ t.params.root_path | default('.', true) | tojson }}
+    if not SHELL_EXECUTION_ENABLED:
+        message = 'Arm shell execution from the top toolbar for this graph before running shell tools.'
+        return _tool_payload_json('shell', 'shell_command', 'blocked', reason_code='shell_not_armed', message=message, requested_command=str(command or ''), root=configured_root, allowed_commands=allowed_commands)
+    root, root_error = _resolve_filesystem_root(configured_root)
+    if root_error:
+        return _tool_payload_json('shell', 'shell_command', 'blocked', reason_code='invalid_cwd', message=root_error, requested_command=str(command or ''), root=str(root) if root is not None else configured_root, allowed_commands=allowed_commands)
+    if not allowed_commands:
+        message = 'allowed_commands is empty for this shell tool.'
+        return _tool_payload_json('shell', 'shell_command', 'blocked', reason_code='missing_shell_allowlist', message=message, requested_command=str(command or ''), root=str(root), allowed_commands=allowed_commands)
+    argv, command_error = _normalize_shell_command(command)
+    if command_error or argv is None:
+        return _tool_payload_json('shell', 'shell_command', 'blocked', reason_code='invalid_shell_command', message=command_error or 'Unable to parse shell command.', requested_command=str(command or ''), root=str(root), allowed_commands=allowed_commands)
+    executable = Path(argv[0]).name.lower()
+    if executable not in allowed_commands:
+        message = f"Executable '{executable}' is not in the allowlist ({', '.join(allowed_commands)})."
+        return _tool_payload_json('shell', 'shell_command', 'blocked', reason_code='shell_command_not_allowed', message=message, requested_command=str(command or ''), parsed_command=argv, root=str(root), allowed_commands=allowed_commands)
+    try:
+        completed = subprocess.run(argv, cwd=str(root), env=_build_shell_env(), capture_output=True, text=True, timeout=timeout_seconds, shell=False)
+    except Exception as exc:
+        return _tool_payload_json('shell', 'shell_command', 'failed', reason_code='shell_runtime_failure', message=str(exc), requested_command=str(command or ''), parsed_command=argv, root=str(root), allowed_commands=allowed_commands)
+    stdout, stdout_truncated = _truncate_text(completed.stdout or '', max_chars=6000)
+    stderr, stderr_truncated = _truncate_text(completed.stderr or '', max_chars=6000)
+    status = 'succeeded' if completed.returncode == 0 else 'failed'
+    reason_code = None if completed.returncode == 0 else 'shell_command_failed'
+    message = 'Shell command completed successfully.' if completed.returncode == 0 else f'Shell command exited with status {completed.returncode}.'
+    return _tool_payload_json('shell', 'shell_command', status, reason_code=reason_code, message=message, root=str(root), requested_command=str(command or ''), parsed_command=argv, allowed_commands=allowed_commands, exit_code=completed.returncode, stdout=stdout, stderr=stderr, stdout_truncated=stdout_truncated, stderr_truncated=stderr_truncated)
+
+{% elif t.type == 'sql_query' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(query: str) -> str:
+{% else %}
+def {{ t.id }}(query: str) -> str:
+{% endif %}
+    """{{ t.description | default("Run a read-only SQL query against the configured SQLite database.", true) }}"""
+    import json
+    from langchain_community.utilities import SQLDatabase
+
+    db_uri, db_path = _normalize_sqlite_target({{ t.params.db_path | default('data.db', true) | tojson }})
+    read_only = _coerce_bool({{ 'True' if t.params.read_only is not sameas false and t.params.read_only != 'false' else 'False' }}, default=True)
+    allowed, reason = _sql_read_only_guard(query)
+    if not read_only:
+        return f"SQL execution blocked: read_only=false is not allowed in this build."
+    if not allowed:
+        return f"SQL execution blocked: {reason}"
+    db = SQLDatabase.from_uri(db_uri)
+    try:
+        result = db.run(query)
+        warning = _sql_limit_warning(query)
+        payload = {'mode': 'read_only', 'db_path': db_path, 'query': query, 'result': result, 'warning': warning}
+        text_result, truncated = _truncate_text(payload)
+        if truncated and payload.get('warning') is None:
+            payload['warning'] = 'Result preview truncated; tighten the query or add LIMIT for a smaller payload.'
+            text_result, _ = _truncate_text(payload)
+        return text_result
+    except Exception as e:
+        return f"SQL error: {str(e)}"
+
+{% elif t.type == 'sql_list_tables' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(dummy: str = "") -> str:
+{% else %}
+def {{ t.id }}(dummy: str = "") -> str:
+{% endif %}
+    """{{ t.description | default("List tables from the configured SQLite database.", true) }}"""
+    import json
+    from langchain_community.utilities import SQLDatabase
+
+    db_uri, db_path = _normalize_sqlite_target({{ t.params.db_path | default('data.db', true) | tojson }})
+    try:
+        db = SQLDatabase.from_uri(db_uri)
+        tables = sorted(db.get_usable_table_names())
+        return json.dumps({'db_path': db_path, 'tables': tables, 'count': len(tables)}, ensure_ascii=False)
+    except Exception as e:
+        return f"SQL inspection error: {str(e)}"
+
+{% elif t.type == 'sql_get_schema' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(table_names: str) -> str:
+{% else %}
+def {{ t.id }}(table_names: str) -> str:
+{% endif %}
+    """{{ t.description | default("Read table schema from the configured SQLite database.", true) }}"""
+    from langchain_community.utilities import SQLDatabase
+
+    db_uri, db_path = _normalize_sqlite_target({{ t.params.db_path | default('data.db', true) | tojson }})
+    wanted = _parse_list_argument(table_names)
+    if not wanted:
+        return "SQL schema inspection needs one or more table names separated by commas or new lines."
+    try:
+        db = SQLDatabase.from_uri(db_uri)
+        schema_text = db.get_table_info(wanted)
+        payload = {'db_path': db_path, 'tables': wanted, 'schema': schema_text}
+        text_result, _ = _truncate_text(payload)
+        return text_result
+    except Exception as e:
+        return f"SQL schema inspection error: {str(e)}"
+
+{% elif t.type == 'sql_query_check' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(query: str) -> str:
+{% else %}
+def {{ t.id }}(query: str) -> str:
+{% endif %}
+    """{{ t.description | default("Validate a SQL query against the read-only-first policy.", true) }}"""
+    import json
+
+    allowed, reason = _sql_read_only_guard(query)
+    warning = _sql_limit_warning(query)
+    return json.dumps({'allowed': allowed, 'reason': reason, 'warning': warning, 'query': query}, ensure_ascii=False)
+
+{% elif t.type == 'brave_search' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(query: str) -> str:
+{% else %}
+def {{ t.id }}(query: str) -> str:
+{% endif %}
+    """{{ t.description | default("Brave provider-backed web search for current information.", true) }}"""
+    env_name = {{ t.params.brave_api_key | default('BRAVE_SEARCH_API_KEY', true) | tojson }}
+    api_key = os.getenv(env_name, '')
+    if not api_key:
+        return f"Brave search unavailable: missing environment variable '{env_name}'."
+    try:
+        response = requests.get(
+            'https://api.search.brave.com/res/v1/web/search',
+            headers={
+                'Accept': 'application/json',
+                'Accept-Encoding': 'gzip',
+                'X-Subscription-Token': api_key,
+            },
+            params={
+                'q': query,
+                'count': {{ t.params.max_results | default(5, true) }},
+            },
+            timeout=_normalize_timeout({{ t.params.timeout_seconds | default(15, true) }} , default=15),
+        )
+        response.raise_for_status()
+        payload = response.json()
+        results = _extract_brave_web_results(payload)
+        return json.dumps({'provider': 'brave', 'query': query, 'results': results, 'raw_result_count': len(results)}, ensure_ascii=False, default=str)
+    except Exception as e:
+        return f"Brave search error: {str(e)}"
+
+{% elif t.type == 'duckduckgo_search' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(query: str) -> str:
+{% else %}
+def {{ t.id }}(query: str) -> str:
+{% endif %}
+    """{{ t.description | default("DuckDuckGo search for current public web results.", true) }}"""
+    max_results = {{ t.params.max_results | default(5, true) }}
+    try:
+        try:
+            from duckduckgo_search import DDGS
+            results = list(DDGS().text(query, max_results=max_results))
+        except Exception:
+            from langchain_community.tools import DuckDuckGoSearchResults
+            search_tool = DuckDuckGoSearchResults(num_results=max_results)
+            {% if is_async %}
+            results = await search_tool.ainvoke(query)
+            {% else %}
+            results = search_tool.invoke(query)
+            {% endif %}
+        return json.dumps({'provider': 'duckduckgo', 'query': query, 'results': results}, ensure_ascii=False, default=str)
+    except Exception as e:
+        return f"DuckDuckGo search error: {str(e)}"
+
+{% elif t.type == 'requests_get' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(path_or_url: str, query_params_json: str = "") -> str:
+{% else %}
+def {{ t.id }}(path_or_url: str, query_params_json: str = "") -> str:
+{% endif %}
+    """{{ t.description | default("Requests toolkit GET surface for stateless HTTP reads.", true) }}"""
+    target_url, target_error = _resolve_requests_target(
+        {{ t.params.base_url | default('', true) | tojson }},
+        path_or_url,
+        allow_full_urls=_coerce_bool({{ 'True' if t.params.allow_full_urls == 'true' else 'False' }}, default=False),
+    )
+    if target_error:
+        return f"Requests GET blocked: {target_error}"
+    query_params, query_error = _parse_json_object_arg(query_params_json, label='query_params_json', default={})
+    if query_error:
+        return f"Requests GET blocked: {query_error}"
+    try:
+        response = requests.get(
+            target_url,
+            params=query_params,
+            headers={{ t.params.headers | default({}) }},
+            timeout=_normalize_timeout({{ t.params.timeout_seconds | default(15, true) }}, default=15),
+        )
+        preview = _requests_preview_payload(response)
+        preview.update({'toolkit': 'requests', 'method': 'GET', 'url': target_url})
+        return json.dumps(preview, ensure_ascii=False, default=str)
+    except Exception as e:
+        return f"Requests GET error: {str(e)}"
+
+{% elif t.type == 'requests_post' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(path_or_url: str, payload_json: str = "{}", query_params_json: str = "") -> str:
+{% else %}
+def {{ t.id }}(path_or_url: str, payload_json: str = "{}", query_params_json: str = "") -> str:
+{% endif %}
+    """{{ t.description | default("Requests toolkit POST surface for stateless HTTP writes or RPC-style calls.", true) }}"""
+    target_url, target_error = _resolve_requests_target(
+        {{ t.params.base_url | default('', true) | tojson }},
+        path_or_url,
+        allow_full_urls=_coerce_bool({{ 'True' if t.params.allow_full_urls == 'true' else 'False' }}, default=False),
+    )
+    if target_error:
+        return f"Requests POST blocked: {target_error}"
+    payload_dict, payload_error = _parse_json_object_arg(payload_json, label='payload_json', default={})
+    if payload_error:
+        return f"Requests POST blocked: {payload_error}"
+    query_params, query_error = _parse_json_object_arg(query_params_json, label='query_params_json', default={})
+    if query_error:
+        return f"Requests POST blocked: {query_error}"
+    try:
+        response = requests.post(
+            target_url,
+            params=query_params,
+            json=payload_dict,
+            headers={{ t.params.headers | default({}) }},
+            timeout=_normalize_timeout({{ t.params.timeout_seconds | default(15, true) }}, default=15),
+        )
+        preview = _requests_preview_payload(response)
+        preview.update({'toolkit': 'requests', 'method': 'POST', 'url': target_url})
+        return json.dumps(preview, ensure_ascii=False, default=str)
+    except Exception as e:
+        return f"Requests POST error: {str(e)}"
+
+{% elif t.type == 'web_search' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(query: str) -> str:
+{% else %}
+def {{ t.id }}(query: str) -> str:
+{% endif %}
+    """{{ t.description | default("Tavily-backed web search for current information.", true) }}"""
+    import json
+    import os
+
+    env_name = {{ t.params.tavily_api_key | default('TAVILY_API_KEY', true) | tojson }}
+    api_key = os.getenv(env_name, '')
+    if not api_key:
+        return f"Tavily search unavailable: missing environment variable '{env_name}'."
+    os.environ['TAVILY_API_KEY'] = api_key
+    try:
+        try:
+            from langchain_tavily import TavilySearch
+            search_tool = TavilySearch(max_results={{ t.params.max_results | default(3, true) }})
+        except Exception:
+            from langchain_community.tools.tavily_search import TavilySearchResults
+            search_tool = TavilySearchResults(max_results={{ t.params.max_results | default(3, true) }})
+        {% if is_async %}
+        results = await search_tool.ainvoke({"query": query})
+        {% else %}
+        results = search_tool.invoke({"query": query})
+        {% endif %}
+        return json.dumps({'provider': 'tavily', 'query': query, 'results': results}, ensure_ascii=False, default=str)
+    except Exception as e:
+        return f"Tavily search error: {str(e)}"
+
+{% elif t.type == 'tavily_extract' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(urls: str) -> str:
+{% else %}
+def {{ t.id }}(urls: str) -> str:
+{% endif %}
+    """{{ t.description | default("Tavily-backed extraction from provided URLs.", true) }}"""
+    import json
+    import os
+
+    env_name = {{ t.params.tavily_api_key | default('TAVILY_API_KEY', true) | tojson }}
+    api_key = os.getenv(env_name, '')
+    if not api_key:
+        return f"Tavily extract unavailable: missing environment variable '{env_name}'."
+    normalized_urls = _parse_list_argument(urls)
+    if not normalized_urls:
+        return "Tavily extract needs one or more URLs separated by commas or new lines."
+    os.environ['TAVILY_API_KEY'] = api_key
+    try:
+        from langchain_tavily import TavilyExtract
+        extract_tool = TavilyExtract(
+            extract_depth={{ t.params.extract_depth | default('basic', true) | tojson }},
+            include_images=_coerce_bool({{ 'True' if t.params.include_images and t.params.include_images != 'false' else 'False' }}, default=False),
+        )
+        payload = {'urls': normalized_urls}
+        {% if is_async %}
+        try:
+            results = await extract_tool.ainvoke(payload)
+        except Exception:
+            results = await extract_tool.ainvoke(normalized_urls)
+        {% else %}
+        try:
+            results = extract_tool.invoke(payload)
+        except Exception:
+            results = extract_tool.invoke(normalized_urls)
+        {% endif %}
+        return json.dumps({'provider': 'tavily', 'urls': normalized_urls, 'results': results}, ensure_ascii=False, default=str)
+    except Exception as e:
+        return f"Tavily extract error: {str(e)}"
+
+{% elif t.type == 'github_get_issue' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(issue_number: str) -> str:
+{% else %}
+def {{ t.id }}(issue_number: str) -> str:
+{% endif %}
+    """{{ t.description | default("Read one GitHub issue from the configured repository.", true) }}"""
+    try:
+        normalized_issue, issue_error = _normalize_positive_int(issue_number, label='Issue number')
+        if issue_error:
+            return issue_error
+        tool_obj = _load_github_tool('Get Issue')
+        if tool_obj is None:
+            return 'GitHub toolkit error: Get Issue tool unavailable in the installed LangChain toolkit.'
+        payload = {'issue_number': normalized_issue}
+        fallback = str(normalized_issue)
+        {% if is_async %}
+        try:
+            result = await tool_obj.ainvoke(payload)
+        except Exception:
+            result = await tool_obj.ainvoke(fallback)
+        {% else %}
+        result = _invoke_sync_tool(tool_obj, payload, fallback)
+        {% endif %}
+        return str(result)
+    except Exception as e:
+        return f"GitHub read error: {str(e)}"
+
+{% elif t.type == 'github_get_pull_request' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(pull_request_number: str) -> str:
+{% else %}
+def {{ t.id }}(pull_request_number: str) -> str:
+{% endif %}
+    """{{ t.description | default("Read one GitHub pull request from the configured repository.", true) }}"""
+    try:
+        normalized_pr, pr_error = _normalize_positive_int(pull_request_number, label='Pull request number')
+        if pr_error:
+            return pr_error
+        tool_obj = _load_github_tool('Get Pull Request')
+        if tool_obj is None:
+            return 'GitHub toolkit error: Get Pull Request tool unavailable in the installed LangChain toolkit.'
+        payload = {'pr_number': normalized_pr, 'pull_request_number': normalized_pr}
+        fallback = str(normalized_pr)
+        {% if is_async %}
+        try:
+            result = await tool_obj.ainvoke(payload)
+        except Exception:
+            result = await tool_obj.ainvoke(fallback)
+        {% else %}
+        result = _invoke_sync_tool(tool_obj, payload, fallback)
+        {% endif %}
+        return str(result)
+    except Exception as e:
+        return f"GitHub read error: {str(e)}"
+
+{% elif t.type == 'github_read_file' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(path: str) -> str:
+{% else %}
+def {{ t.id }}(path: str) -> str:
+{% endif %}
+    """{{ t.description | default("Read a file from the configured GitHub repository.", true) }}"""
+    try:
+        normalized_path, path_error = _normalize_repo_relative_path(path)
+        if path_error:
+            return path_error
+        tool_obj = _load_github_tool('Read File')
+        if tool_obj is None:
+            return 'GitHub toolkit error: Read File tool unavailable in the installed LangChain toolkit.'
+        payload = {'path': normalized_path}
+        fallback = str(normalized_path)
+        {% if is_async %}
+        try:
+            result = await tool_obj.ainvoke(payload)
+        except Exception:
+            result = await tool_obj.ainvoke(fallback)
+        {% else %}
+        result = _invoke_sync_tool(tool_obj, payload, fallback)
+        {% endif %}
+        return str(result)
+    except Exception as e:
+        return f"GitHub read error: {str(e)}"
+
+{% elif t.type == 'github_search_issues_prs' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(query: str) -> str:
+{% else %}
+def {{ t.id }}(query: str) -> str:
+{% endif %}
+    """{{ t.description | default("Search issues and pull requests in the configured GitHub repository.", true) }}"""
+    try:
+        normalized_query = str(query or '').strip()
+        if not normalized_query:
+            return 'GitHub search query is empty.'
+        tool_obj = _load_github_tool('Search issues and pull requests')
+        if tool_obj is None:
+            return 'GitHub toolkit error: Search issues and pull requests tool unavailable in the installed LangChain toolkit.'
+        {% if is_async %}
+        result = await tool_obj.ainvoke(normalized_query)
+        {% else %}
+        result = tool_obj.invoke(normalized_query)
+        {% endif %}
+        return str(result)
+    except Exception as e:
+        return f"GitHub read error: {str(e)}"
+
+{% elif t.type == 'rpg_dice_roller' %}
+{% elif t.type == 'rpg_dice_roller' %}
+@tool
+def {{ t.id }}(notation: str) -> str:
+    """{{ t.description | default("Simule un jet de dés pour un jeu de rôle. Notation standard RPG : 1d20, 2d6, 3d8+2.", true) }}"""
+    import re
+    import random
+    
+    match = re.match(r'(\d+)\s*[dD]\s*(\d+)(?:\s*([\+\-])\s*(\d+))?', notation.strip())
+    if not match:
+        return f"Erreur : '{notation}' est invalide. Utilisez le format '1d20' ou '2d6+3'."
+        
+    num_dice = int(match.group(1))
+    faces = int(match.group(2))
+    sign = match.group(3)
+    modifier = int(match.group(4)) if match.group(4) else 0
+    
+    if num_dice > 100 or faces > 1000:
+        return "Erreur : Nombre de dés ou de faces trop élevé."
+        
+    rolls = [random.randint(1, faces) for _ in range(num_dice)]
+    total = sum(rolls)
+    
+    if sign == '+':
+        total += modifier
+    elif sign == '-':
+        total -= modifier
+        
+    details = f"{rolls} {'+ ' + str(modifier) if sign == '+' else '- ' + str(modifier) if sign == '-' else ''}"
+    return f"Jet de {notation} : {details.strip()} => TOTAL : {total}"
+
+{% elif t.type == 'pw_navigate' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(url: str) -> str:
+{% else %}
+def {{ t.id }}(url: str) -> str:
+{% endif %}
+    """{{ t.description | default("Navigue vers une URL spécifique. À utiliser en premier avant les autres outils Playwright.", true) }}"""
+    try:
+        {% if is_async %}
+        page = await get_playwright_page()
+        {% else %}
+        page = get_playwright_page()
+        {% endif %}
+        if page is None:
+            return "Erreur : Playwright non disponible. Installez playwright et exécutez 'playwright install'."
+        {% if is_async %}
+        await page.goto(url, wait_until="domcontentloaded", timeout=15000)
+        {% else %}
+        page.goto(url, wait_until="domcontentloaded", timeout=15000)
+        {% endif %}
+        return f"Succès : Navigation terminée vers {url}. Vous pouvez maintenant extraire le texte ou cliquer."
+    except Exception as e:
+        return f"Erreur de navigation vers {url}. Détail : {str(e)}"
+
+{% elif t.type == 'pw_click' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(selector: str) -> str:
+{% else %}
+def {{ t.id }}(selector: str) -> str:
+{% endif %}
+    """{{ t.description | default("Clique sur un élément de la page via un sélecteur CSS (ex: button#submit, .login-link).", true) }}"""
+    try:
+        {% if is_async %}
+        page = await get_playwright_page()
+        {% else %}
+        page = get_playwright_page()
+        {% endif %}
+        if page is None:
+            return "Erreur : Playwright non disponible."
+        {% if is_async %}
+        await page.click(selector, timeout=5000)
+        await page.wait_for_timeout(1000)
+        {% else %}
+        page.click(selector, timeout=5000)
+        page.wait_for_timeout(1000)
+        {% endif %}
+        return f"Succès : Clic effectué sur le sélecteur '{selector}'."
+    except Exception as e:
+        return f"Erreur de clic sur '{selector}'. Vérifiez que le sélecteur est correct ou visible. Détail : {str(e)}"
+
+{% elif t.type == 'pw_extract_text' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(dummy: str = "") -> str:
+{% else %}
+def {{ t.id }}(dummy: str = "") -> str:
+{% endif %}
+    """{{ t.description | default("Extrait tout le texte lisible de la page web courante.", true) }}"""
+    try:
+        {% if is_async %}
+        page = await get_playwright_page()
+        {% else %}
+        page = get_playwright_page()
+        {% endif %}
+        if page is None:
+            return "Erreur : Playwright non disponible."
+        try:
+            {% if is_async %}
+            await page.wait_for_load_state('networkidle', timeout=3000)
+            {% else %}
+            page.wait_for_load_state('networkidle', timeout=3000)
+            {% endif %}
+        except Exception:
+            pass
+        {% if is_async %}
+        text = await page.evaluate("document.body.innerText")
+        {% else %}
+        text = page.evaluate("document.body.innerText")
+        {% endif %}
+        max_chars = 8000
+        if len(text) > max_chars:
+            return f"Texte extrait (tronqué aux {max_chars} premiers caractères) :\n\n{text[:max_chars]}"
+        return f"Texte extrait :\n\n{text}"
+    except Exception as e:
+        return f"Erreur lors de l'extraction du texte : {str(e)}"
+
+{% elif t.type == 'pw_extract_links' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(absolute_urls: bool = True) -> str:
+{% else %}
+def {{ t.id }}(absolute_urls: bool = True) -> str:
+{% endif %}
+    """{{ t.description | default("Extrait tous les liens hypertexte de la page web courante.", true) }}"""
+    try:
+        {% if is_async %}
+        page = await get_playwright_page()
+        {% else %}
+        page = get_playwright_page()
+        {% endif %}
+        if page is None:
+            return "Erreur : Playwright non disponible."
+        {% if is_async %}
+        links = await page.evaluate("""() => {
+        {% else %}
+        links = page.evaluate("""() => {
+        {% endif %}
+            return Array.from(document.querySelectorAll('a[href]')).map(a => ({
+                text: a.innerText.trim().substring(0, 100),
+                href: a.href
+            })).filter(l => l.text.length > 0);
+        }""")
+        if not links:
+            return "Aucun lien trouvé sur la page."
+        result = "\n".join([f"- [{l['text']}]({l['href']})" for l in links[:50]])
+        return f"Liens extraits ({len(links)} trouvés, max 50 affichés) :\n{result}"
+    except Exception as e:
+        return f"Erreur extraction liens : {str(e)}"
+
+{% elif t.type == 'pw_get_elements' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(selector: str) -> str:
+{% else %}
+def {{ t.id }}(selector: str) -> str:
+{% endif %}
+    """{{ t.description | default("Récupère les éléments correspondant au sélecteur CSS. Utile pour découvrir la structure de la page.", true) }}"""
+    try:
+        {% if is_async %}
+        page = await get_playwright_page()
+        {% else %}
+        page = get_playwright_page()
+        {% endif %}
+        if page is None:
+            return "Erreur : Playwright non disponible."
+        {% if is_async %}
+        elements = await page.evaluate("""(sel) => {
+        {% else %}
+        elements = page.evaluate("""(sel) => {
+        {% endif %}
+            return Array.from(document.querySelectorAll(sel)).slice(0, 20).map(el => ({
+                tag: el.tagName.toLowerCase(),
+                id: el.id || null,
+                class: el.className || null,
+                text: el.innerText ? el.innerText.trim().substring(0, 80) : null,
+                type: el.type || null,
+                name: el.name || null,
+                href: el.href || null
+            }));
+        }""", selector)
+        if not elements:
+            return f"Aucun élément trouvé pour le sélecteur '{selector}'."
+        lines = []
+        for el in elements:
+            parts = [f"<{el['tag']}"]
+            if el.get('id'): parts.append(f'id="{el["id"]}"')
+            if el.get('class'): parts.append(f'class="{el["class"]}"')
+            if el.get('name'): parts.append(f'name="{el["name"]}"')
+            if el.get('type'): parts.append(f'type="{el["type"]}"')
+            parts.append(">")
+            desc = " ".join(parts)
+            if el.get('text'): desc += f' → "{el["text"]}"'
+            lines.append(f"  {desc}")
+        return f"Éléments trouvés ({len(elements)}) :\n" + "\n".join(lines)
+    except Exception as e:
+        return f"Erreur récupération éléments pour '{selector}'. Détail : {str(e)}"
+
+{% elif t.type == 'pw_current_page' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(dummy: str = "") -> str:
+{% else %}
+def {{ t.id }}(dummy: str = "") -> str:
+{% endif %}
+    """{{ t.description | default("Retourne l'URL et le titre de la page web courante.", true) }}"""
+    try:
+        {% if is_async %}
+        page = await get_playwright_page()
+        {% else %}
+        page = get_playwright_page()
+        {% endif %}
+        if page is None:
+            return "Erreur : Playwright non disponible."
+        url = page.url
+        {% if is_async %}
+        title = await page.title()
+        {% else %}
+        title = page.title()
+        {% endif %}
+        return f"Page courante : {title}\nURL : {url}"
+    except Exception as e:
+        return f"Erreur page courante : {str(e)}"
+
+{% elif t.type == 'playwright_scroll' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(direction: str = "down") -> str:
+{% else %}
+def {{ t.id }}(direction: str = "down") -> str:
+{% endif %}
+    """{{ t.description | default("Fait défiler la page d'un écran vers le bas ('down') ou vers le haut ('up'). Indispensable pour charger le contenu supplémentaire sur les pages infinies.", true) }}"""
+    try:
+        {% if is_async %}
+        page = await get_playwright_page()
+        {% else %}
+        page = get_playwright_page()
+        {% endif %}
+        if page is None:
+            return "Erreur : Playwright non disponible."
+        if direction.lower() == "up":
+            {% if is_async %}
+            await page.evaluate("window.scrollBy(0, -window.innerHeight)")
+            {% else %}
+            page.evaluate("window.scrollBy(0, -window.innerHeight)")
+            {% endif %}
+            action = "haut"
+        else:
+            {% if is_async %}
+            await page.evaluate("window.scrollBy(0, window.innerHeight)")
+            {% else %}
+            page.evaluate("window.scrollBy(0, window.innerHeight)")
+            {% endif %}
+            action = "bas"
+        {% if is_async %}
+        await page.wait_for_timeout(1000)
+        {% else %}
+        page.wait_for_timeout(1000)
+        {% endif %}
+        return f"Succès : Défilement vers le {action} effectué. Vous pouvez extraire le texte à nouveau."
+    except Exception as e:
+        return f"Erreur lors du défilement : {str(e)}"
+
+{% elif t.type == 'playwright_extract_links' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(dummy: str = "") -> str:
+{% else %}
+def {{ t.id }}(dummy: str = "") -> str:
+{% endif %}
+    """{{ t.description | default("Extrait tous les liens cliquables de la page avec leur texte et leur URL (href). Utile pour savoir où naviguer ensuite.", true) }}"""
+    try:
+        {% if is_async %}
+        page = await get_playwright_page()
+        {% else %}
+        page = get_playwright_page()
+        {% endif %}
+        if page is None:
+            return "Erreur : Playwright non disponible."
+        {% if is_async %}
+        links = await page.evaluate("""() => {
+        {% else %}
+        links = page.evaluate("""() => {
+        {% endif %}
+            return Array.from(document.querySelectorAll('a'))
+                .map(a => ({ text: a.innerText.trim(), href: a.href }))
+                .filter(l => l.text.length > 0 && l.href.startsWith('http'));
+        }""")
+        if not links:
+            return "Aucun lien trouvé sur cette page."
+        formatted_links = "\n".join([f"- {l['text']} : {l['href']}" for l in links[:50]])
+        return f"Voici les liens trouvés sur la page :\n{formatted_links}"
+    except Exception as e:
+        return f"Erreur d'extraction des liens : {str(e)}"
+
+{% elif t.type == 'playwright_keypress' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(key: str) -> str:
+{% else %}
+def {{ t.id }}(key: str) -> str:
+{% endif %}
+    """{{ t.description | default("Simule l'appui sur une touche du clavier. Touches acceptées : Enter, Escape, Tab, ArrowDown, ArrowUp. Utile pour valider une recherche ou fermer un pop-up.", true) }}"""
+    try:
+        {% if is_async %}
+        page = await get_playwright_page()
+        {% else %}
+        page = get_playwright_page()
+        {% endif %}
+        if page is None:
+            return "Erreur : Playwright non disponible."
+        {% if is_async %}
+        await page.keyboard.press(key)
+        await page.wait_for_timeout(1000)
+        {% else %}
+        page.keyboard.press(key)
+        page.wait_for_timeout(1000)
+        {% endif %}
+        return f"Succès : Touche '{key}' pressée."
+    except Exception as e:
+        return f"Erreur lors de l'appui sur la touche '{key}' : {str(e)}"
+
+{% elif t.type == 'playwright_screenshot' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(dummy: str = "") -> str:
+{% else %}
+def {{ t.id }}(dummy: str = "") -> str:
+{% endif %}
+    """{{ t.description | default("Prend une capture d'écran de la page actuelle. Retourne l'image encodée en base64 pour être analysée par un modèle Vision.", true) }}"""
+    import base64
+    try:
+        {% if is_async %}
+        page = await get_playwright_page()
+        {% else %}
+        page = get_playwright_page()
+        {% endif %}
+        if page is None:
+            return "Erreur : Playwright non disponible."
+        {% if is_async %}
+        screenshot_bytes = await page.screenshot(full_page=True)
+        {% else %}
+        screenshot_bytes = page.screenshot(full_page=True)
+        {% endif %}
+        b64_image = base64.b64encode(screenshot_bytes).decode('utf-8')
+        return f"CAPTURE_ECRAN_BASE64:{b64_image}"
+    except Exception as e:
+        return f"Erreur lors de la capture d'écran : {str(e)}"
+
+{% elif t.type == 'playwright_wait' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(seconds: int) -> str:
+{% else %}
+def {{ t.id }}(seconds: int) -> str:
+{% endif %}
+    """{{ t.description | default("Met le navigateur en pause pendant un nombre de secondes défini. À utiliser si la page indique 'Chargement en cours...' ou si un élément n'est pas encore apparu. Ne dépassez pas 5 secondes d'attente.", true) }}"""
+    try:
+        safe_seconds = min(max(1, seconds), 10)
+        {% if is_async %}
+        page = await get_playwright_page()
+        {% else %}
+        page = get_playwright_page()
+        {% endif %}
+        if page is None:
+            return "Erreur : Playwright non disponible."
+        {% if is_async %}
+        await page.wait_for_timeout(safe_seconds * 1000)
+        {% else %}
+        page.wait_for_timeout(safe_seconds * 1000)
+        {% endif %}
+        return f"Attente de {safe_seconds} secondes terminée. Vous pouvez relancer une extraction de texte ou un clic."
+    except Exception as e:
+        return f"Erreur lors de l'attente : {str(e)}"
+
+{% elif t.type == 'pw_fill' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(selector: str, text: str) -> str:
+{% else %}
+def {{ t.id }}(selector: str, text: str) -> str:
+{% endif %}
+    """{{ t.description | default("Remplit un champ de saisie avec du texte via un sélecteur CSS.", true) }}"""
+    try:
+        {% if is_async %}
+        page = await get_playwright_page()
+        {% else %}
+        page = get_playwright_page()
+        {% endif %}
+        if page is None:
+            return "Erreur : Playwright non disponible."
+        {% if is_async %}
+        await page.fill(selector, text, timeout=5000)
+        {% else %}
+        page.fill(selector, text, timeout=5000)
+        {% endif %}
+        return f"Succès : Champ '{selector}' rempli avec '{text}'."
+    except Exception as e:
+        return f"Erreur de remplissage sur '{selector}'. Vérifiez que le sélecteur correspond à un champ de saisie. Détail : {str(e)}"
+
+{% elif t.type == 'tool_llm_worker' %}
+@tool
+{% if is_async %}
+async def {{ t.id }}(query: str) -> str:
+{% else %}
+def {{ t.id }}(query: str) -> str:
+{% endif %}
+    """{{ t.description | default('Agent expert pour traiter une sous-tâche') }}"""
+    from langchain_core.messages import SystemMessage, HumanMessage
+    try:
+        llm = _build_chat_model(
+            provider={{ t.params.provider | default('openai') | tojson }},
+            model_name={{ t.params.model_name | default('gpt-4o-mini') | tojson }},
+            temperature={{ t.params.temperature | default(0.0) }},
+            explicit_env={{ t.params.api_key_env | default('', true) | tojson }},
+            api_base_url={{ t.params.api_base_url | default('', true) | tojson }},
+            max_tokens={{ t.params.max_tokens | default(None, true) | tojson }},
+            top_p={{ t.params.top_p | default(None, true) | tojson }},
+            frequency_penalty={{ t.params.frequency_penalty | default(None, true) | tojson }},
+            presence_penalty={{ t.params.presence_penalty | default(None, true) | tojson }},
+            stop_sequences={{ t.params.stop_sequences | default([], true) | tojson }},
+        )
+        msgs = [
+            SystemMessage(content={{ t.params.system_prompt | default('Tu es un assistant expert.') | tojson }}),
+            HumanMessage(content=query)
+        ]
+        {% if is_async %}
+        res = await llm.ainvoke(msgs)
+        {% else %}
+        res = llm.invoke(msgs)
+        {% endif %}
+        return str(res.content)
+    except Exception as e:
+        return f"Erreur LLM Worker: {str(e)}"
+
+{% elif t.type == 'sub_agent_tool' %}
+{% set has_direct_target = (t.params.target_agent | default('', true)) | length > 0 %}
+@tool
+{% if has_direct_target %}
+{% if is_async %}
+async def {{ t.id }}(query: str) -> str:
+{% else %}
+def {{ t.id }}(query: str) -> str:
+{% endif %}
+    """{{ t.description | default("Call one configured subagent for a focused task.", true) }}"""
+    try:
+        target_group = {{ t.params.target_group | default('default', true) | tojson }}
+        target_agent = {{ t.params.target_agent | default('', true) | tojson }}
+        resolved = _find_subagent_entry(target_group, target_agent)
+        if not resolved:
+            return f"Erreur: sous-agent '{target_agent}' introuvable dans le groupe '{target_group or 'default'}'."
+        agent_entry = resolved['agent']
+        llm_with_tools, msgs = _invoke_subagent(
+            agent_entry,
+            query,
+            provider={{ t.params.provider | default('openai') | tojson }},
+            model_name={{ t.params.model_name | default('gpt-4o-mini') | tojson }},
+            temperature={{ t.params.temperature | default(0.3) }},
+            explicit_env={{ t.params.api_key_env | default('', true) | tojson }},
+            api_base_url={{ t.params.api_base_url | default('', true) | tojson }},
+            max_tokens={{ t.params.max_tokens | default(None, true) | tojson }},
+            top_p={{ t.params.top_p | default(None, true) | tojson }},
+            frequency_penalty={{ t.params.frequency_penalty | default(None, true) | tojson }},
+            presence_penalty={{ t.params.presence_penalty | default(None, true) | tojson }},
+            stop_sequences={{ t.params.stop_sequences | default([], true) | tojson }},
+        )
+        {% if is_async %}
+        res = await llm_with_tools.ainvoke(msgs)
+        {% else %}
+        res = llm_with_tools.invoke(msgs)
+        {% endif %}
+        content = getattr(res, 'content', res)
+        return str(content) if content is not None else f"Sous-agent {target_agent} exécuté."
+    except Exception as e:
+        return f"Erreur du sous-agent : {str(e)}"
+{% else %}
+{% if is_async %}
+async def {{ t.id }}(agent_name: str, description: str) -> str:
+{% else %}
+def {{ t.id }}(agent_name: str, description: str) -> str:
+{% endif %}
+    """{{ t.description | default("Dispatch to one named subagent from the selected group.", true) }}
+
+Available agents are injected from the selected subagent group at compile time."""
+    try:
+        target_group = {{ t.params.target_group | default('default', true) | tojson }}
+        resolved = _find_subagent_entry(target_group, agent_name)
+        if not resolved:
+            available = ", ".join(row['name'] for row in _format_subagent_group_listing(target_group)) or 'none'
+            return f"Erreur: sous-agent '{agent_name}' introuvable dans le groupe '{target_group or 'default'}'. Disponibles: {available}."
+        agent_entry = resolved['agent']
+        llm_with_tools, msgs = _invoke_subagent(
+            agent_entry,
+            description,
+            provider={{ t.params.provider | default('openai') | tojson }},
+            model_name={{ t.params.model_name | default('gpt-4o-mini') | tojson }},
+            temperature={{ t.params.temperature | default(0.3) }},
+            explicit_env={{ t.params.api_key_env | default('', true) | tojson }},
+            api_base_url={{ t.params.api_base_url | default('', true) | tojson }},
+            max_tokens={{ t.params.max_tokens | default(None, true) | tojson }},
+            top_p={{ t.params.top_p | default(None, true) | tojson }},
+            frequency_penalty={{ t.params.frequency_penalty | default(None, true) | tojson }},
+            presence_penalty={{ t.params.presence_penalty | default(None, true) | tojson }},
+            stop_sequences={{ t.params.stop_sequences | default([], true) | tojson }},
+        )
+        {% if is_async %}
+        res = await llm_with_tools.ainvoke(msgs)
+        {% else %}
+        res = llm_with_tools.invoke(msgs)
+        {% endif %}
+        content = getattr(res, 'content', res)
+        return str(content) if content is not None else f"Sous-agent {agent_name} exécuté."
+    except Exception as e:
+        return f"Erreur du sous-agent : {str(e)}"
+{% endif %}
+
+{% endif %}
+{% endfor %}
+
+# Registre des outils actifs
+ACTIVE_TOOLS_BY_ID = {
+{% for t in tools %}
+    "{{ t.id }}": {{ t.id }},
+{% endfor %}
+}
+
+ACTIVE_TOOLS = list(ACTIVE_TOOLS_BY_ID.values())

@@ -1,0 +1,45 @@
+{
+  "id": "embedded_provider_agent",
+  "kind": "agent",
+  "title": "Embedded Native Provider Agent",
+  "description": "Bounded provider-backed LangChain artifact intended for embedded-native LangGraph orchestration.",
+  "built_in": true,
+  "artifact": {
+    "name": "Embedded Native Provider Agent",
+    "nodes": [
+      {
+        "id": "react_agent_1",
+        "type": "custom",
+        "position": {
+          "x": 280,
+          "y": 180
+        },
+        "data": {
+          "nodeType": "react_agent",
+          "label": "React Agent 1",
+          "params": {
+            "provider": "openai",
+            "model_name": "gpt-4o-mini",
+            "api_key_env": "OPENAI_API_KEY",
+            "temperature": 0.2,
+            "system_prompt": "You are a concise embedded assistant.",
+            "tools_linked": []
+          }
+        }
+      }
+    ],
+    "edges": [],
+    "customStateSchema": [],
+    "graphBindings": [],
+    "isAsync": true,
+    "artifactType": "agent",
+    "executionProfile": "langchain_agent",
+    "projectMode": "langchain",
+    "runtimeSettings": {
+      "recursionLimit": 50,
+      "streamMode": "updates",
+      "debug": false,
+      "inheritParentBindings": true
+    }
+  }
+}

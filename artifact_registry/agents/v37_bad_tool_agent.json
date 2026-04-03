@@ -1,0 +1,41 @@
+{
+  "id": "v37_bad_tool_agent",
+  "kind": "agent",
+  "title": "v37 bad tool agent",
+  "description": "",
+  "built_in": false,
+  "artifact": {
+    "name": "v37 bad tool agent",
+    "artifactType": "agent",
+    "executionProfile": "langchain_agent",
+    "projectMode": "langchain",
+    "nodes": [
+      {
+        "id": "react_agent_1",
+        "type": "custom",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "data": {
+          "nodeType": "react_agent",
+          "label": "React Agent 1",
+          "params": {
+            "provider": "openai",
+            "model_name": "gpt-4o",
+            "tools_linked": [
+              "bad_tool_1"
+            ]
+          }
+        }
+      }
+    ],
+    "edges": [],
+    "tools": [
+      {
+        "id": "bad_tool_1",
+        "type": "web_search"
+      }
+    ]
+  }
+}

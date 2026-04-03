@@ -1,0 +1,40 @@
+{
+  "id": "core_echo_starter",
+  "kind": "graph",
+  "title": "Core Echo Starter",
+  "description": "Starter compile-safe minimal : debug_print relaie les messages d'entrée sans provider.",
+  "built_in": true,
+  "artifact": {
+    "name": "Core Echo Starter",
+    "nodes": [
+      {
+        "id": "debug_print_1",
+        "type": "custom",
+        "position": {
+          "x": 280,
+          "y": 180
+        },
+        "data": {
+          "nodeType": "debug_print",
+          "label": "Debug Print 1",
+          "params": {
+            "input_key": "messages"
+          }
+        }
+      }
+    ],
+    "edges": [],
+    "customStateSchema": [],
+    "graphBindings": [],
+    "isAsync": true,
+    "artifactType": "graph",
+    "executionProfile": "langgraph_async",
+    "projectMode": "langgraph",
+    "runtimeSettings": {
+      "recursionLimit": 50,
+      "streamMode": "updates",
+      "debug": false,
+      "inheritParentBindings": true
+    }
+  }
+}
