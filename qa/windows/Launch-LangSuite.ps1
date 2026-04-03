@@ -120,7 +120,7 @@ function Start-OrDescribeProcess {
     Write-Step $Label
     $display = Format-CommandForLog -FilePath $FilePath -Arguments $Arguments
     if ($DryRun) {
-        Write-Step "[dry-run] Would run in $WorkingDirectory: $display" 'Yellow'
+        Write-Step ("[dry-run] Would run in {0}: {1}" -f $WorkingDirectory, $display) 'Yellow'
         return $null
     }
     $proc = Start-Process -FilePath $FilePath -ArgumentList $Arguments -WorkingDirectory $WorkingDirectory -PassThru
