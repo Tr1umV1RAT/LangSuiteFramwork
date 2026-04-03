@@ -63,6 +63,8 @@ def run():
     stop_text = (QA / 'Stop-LangSuite.sh').read_text(encoding='utf-8')
     expect('Stopping obvious local LangSuite processes' in stop_text, 'stop script does not announce process stop')
     expect('ps -eo' in stop_text, 'stop script does not inspect local processes')
+    expect('node .*vite' in stop_text, 'stop script does not cover node/vite descendants')
+    expect('process group' in stop_text or 'kill -TERM --' in stop_text, 'stop script does not terminate process groups')
 
     uninstall_text = (QA / 'Uninstall-LangSuite.sh').read_text(encoding='utf-8')
     expect('HardReset-LangSuite.sh' in uninstall_text, 'uninstaller does not chain through hard reset')

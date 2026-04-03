@@ -54,11 +54,16 @@ function Require-Command {
 function Resolve-NpmLauncher {
     $npmCmd = Get-Command npm.cmd -ErrorAction SilentlyContinue
     if ($npmCmd) {
-        return @{ FilePath = 'cmd.exe'; PrefixArgs = @('/d', '/c', $npmCmd.Source) ; Display = 'npm.cmd' }
+        return @{ FilePath = $npmCmd.Source; PrefixArgs = @() ; Display = 'npm.cmd' }
     }
     $npm = Get-Command npm -ErrorAction SilentlyContinue
     if ($npm) {
-        return @{ FilePath = 'cmd.exe'; PrefixArgs = @('/d', '/c', $npm.Source) ; Display = $npm.Name }
+        $source = $npm.Source
+        $extension = [System.IO.Path]::GetExtension($source)
+        if ($extension -in @('.cmd', '.bat', '.exe')) {
+            return @{ FilePath = $source; PrefixArgs = @() ; Display = $npm.Name }
+        }
+        return @{ FilePath = 'cmd.exe'; PrefixArgs = @('/d', '/c', $source) ; Display = $npm.Name }
     }
     throw "Required command 'npm' was not found in PATH."
 }

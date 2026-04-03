@@ -449,6 +449,13 @@ export default function BlocksPanelContent() {
                     const capability = getNodeCapabilityInfo(def.type, { artifactType, executionProfile });
                     const maturity = inferNodeMaturity(def.type, { artifactType, executionProfile });
                     const compatible = isNodeCompatibleWithSurface(def.type, { artifactType, executionProfile });
+                    const railKey = (capability.rail && capability.rail in RAIL_LABELS ? capability.rail : 'trunk') as keyof typeof RAIL_LABELS;
+                    const railLabel = (RAIL_LABELS[railKey] || RAIL_LABELS.trunk)
+                      .replace('Rail 0 · ', '')
+                      .replace('Rail 1 · ', '')
+                      .replace('Rail 2 · ', '')
+                      .replace('Rail 3 · ', '')
+                      .replace('Rail 4 · ', '');
                     const paletteTruthChips = [
                       meta.providerLabel,
                       meta.toolFamilyLabel,
@@ -492,7 +499,7 @@ export default function BlocksPanelContent() {
                                   <span className={`px-1.5 py-0.5 rounded text-[9px] border ${ORIGIN_BADGE_CLASSES[meta.origin]}`}>{ORIGIN_LABELS[meta.origin]}</span>
                                   <span className={`px-1.5 py-0.5 rounded text-[9px] border ${SURFACE_BADGE_CLASSES[capability.surfaceLevel]}`}>{SURFACE_LABELS[capability.surfaceLevel]}</span>
                                   <span className={`px-1.5 py-0.5 rounded text-[9px] border ${MATURITY_BADGE_CLASSES[maturity]}`}>{MATURITY_LABELS[maturity]}</span>
-                                  <span className={`px-1.5 py-0.5 rounded text-[9px] border ${RAIL_BADGE_CLASSES[capability.rail]}`}>{RAIL_LABELS[capability.rail].replace('Rail 0 · ', '').replace('Rail 1 · ', '').replace('Rail 2 · ', '').replace('Rail 3 · ', '').replace('Rail 4 · ', '')}</span>
+                                  <span className={`px-1.5 py-0.5 rounded text-[9px] border ${RAIL_BADGE_CLASSES[railKey]}`}>{railLabel}</span>
                                   <span data-testid={`palette-support-${def.type}`} className={`px-1.5 py-0.5 rounded text-[9px] border ${SUPPORT_STATUS_BADGE_CLASSES[capability.supportStatus]}`}>{SUPPORT_STATUS_LABELS[capability.supportStatus]}</span>
                                 </div>
                               )}

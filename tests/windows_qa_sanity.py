@@ -59,13 +59,14 @@ def run():
     expect('--strictPort' in launch_text, 'launcher does not force a stable Vite port')
     expect('Wait-ForHttp' in launch_text, 'launcher does not wait for readiness')
     expect('Resolve-NpmLauncher' in launch_text, 'launcher does not resolve npm.cmd explicitly')
-    expect('cmd.exe' in launch_text, 'launcher does not use cmd.exe for frontend launch')
+    expect('$npmCmd.Source' in launch_text or '$source' in launch_text, 'launcher does not resolve npm executable path for frontend launch')
     expect('Start-Process -FilePath $FilePath' in launch_text, 'launcher does not use direct process launching')
     expect('http://127.0.0.1' in launch_text, 'launcher does not expose a browser URL')
 
     stop_text = (QA / 'Stop-LangSuite.ps1').read_text(encoding='utf-8')
     expect('Stopping obvious local LangSuite processes' in stop_text, 'stop script does not announce process stop')
     expect('Win32_Process' in stop_text, 'stop script does not inspect Windows processes')
+    expect('node(.exe)? .*vite' in stop_text, 'stop script does not cover node/vite descendants')
 
     uninstall_text = (QA / 'Uninstall-LangSuite.ps1').read_text(encoding='utf-8')
     expect('HardReset-LangSuite.ps1' in uninstall_text, 'uninstaller does not chain through hard reset')

@@ -10,7 +10,7 @@
   "backend_port": 8000,
   "frontend_port": 5000,
   "wait_timeout_seconds": 35,
-  "remove_node_modules": false,
-  "clean_npm_cache": false,
+  "remove_node_modules": true,
+  "clean_npm_cache": true,
   "remove_shortcuts": true
 }

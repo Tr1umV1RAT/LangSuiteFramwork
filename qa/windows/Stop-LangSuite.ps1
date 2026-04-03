@@ -34,8 +34,9 @@ function Stop-LangSuiteProcess {
         ($_.CommandLine -match $escaped) -and (
             $_.CommandLine -match 'uvicorn' -or
             $_.CommandLine -match 'vite' -or
-            $_.CommandLine -match 'npm run dev' -or
-            $_.CommandLine -match 'npm run preview'
+            $_.CommandLine -match 'node(.exe)? .*vite' -or
+            $_.CommandLine -match 'npm(.cmd)? run dev' -or
+            $_.CommandLine -match 'npm(.cmd)? run preview'
         )
     }
     if (-not $candidates) {
