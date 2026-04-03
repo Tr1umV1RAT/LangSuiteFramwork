@@ -25,12 +25,19 @@ These tools do **not** claim to package runtime databases, vector stores, or any
 Open the Windows manager:
 
 ```powershell
-.\qa\windows\manager.bat
+.\LangSuiteLauncher.bat
 ```
 
 or
 
 ```powershell
+py .\LangSuiteLauncher.pyw
+```
+
+Legacy QA entrypoints still work too:
+
+```powershell
+.\qa\windows\manager.bat
 py .\qa\windows\LangSuiteLauncher.pyw
 ```
 

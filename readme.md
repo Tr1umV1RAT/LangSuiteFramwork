@@ -11,6 +11,21 @@ Its strongest supported path is:
 5. save in the app,
 6. compile to a runnable Python zip.
 
+## Local launcher / installer-manager
+
+LangSuite now carries a **real local graphical manager** that can be opened directly from the repository root:
+
+- `LangSuiteLauncher.py` / `LangSuiteLauncher.pyw` - cross-platform Tkinter manager entrypoint
+- `LangSuiteLauncher.sh` - Debian/Linux shell wrapper for the manager
+- `LangSuiteLauncher.bat` - Windows wrapper for the manager
+
+Platform-specific local QA scripts remain under:
+
+- `qa/windows/` for PowerShell-backed Windows install / launch / stop / reset / uninstall / shortcuts
+- `qa/linux/` for shell-backed Debian/Linux install / launch / stop / reset / uninstall / shortcuts
+
+These are local repo-management surfaces. They do **not** claim MSI/AppImage/Flatpak/systemd-style packaging or broader deployment semantics.
+
 ## Product truth
 
 - **Core and strongest support**: LangGraph visual authoring.

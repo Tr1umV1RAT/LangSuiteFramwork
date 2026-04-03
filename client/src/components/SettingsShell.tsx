@@ -78,6 +78,7 @@ export default function SettingsShell({ open, onClose }: { open: boolean; onClos
   const updatePreferences = useAppStore((s) => s.updatePreferences);
   const applyWorkspacePreset = useAppStore((s) => s.applyWorkspacePreset);
   const resetLayout = useAppStore((s) => s.resetLayout);
+  const projectPersistence = buildProjectPersistenceSummary();
 
   useEffect(() => {
     if (!open) return;

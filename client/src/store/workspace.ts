@@ -15,7 +15,7 @@ import {
   projectModeAllowsCompile,
   projectModeAllowsRuntime,
 } from '../capabilities';
-import type { GraphBinding, ImportDiagnostic, ModuleLibraryCategory, ModuleLibraryEntry, ModulePromptAssignmentPreset, ModuleStarterArtifactRef, PromptAssignmentTarget, PromptStripAssignment, PromptStripDefinition, PromptStripMergeMode, PromptStripVariableDefinition, RuntimeSettings, SerializedWorkspaceTab, SurfaceTruthSummary, Tab, WorkspaceTreeSnapshot, SubagentDefinition, SubagentGroupDefinition } from './types';
+import type { GraphBinding, ImportDiagnostic, ModuleLibraryCategory, ModuleLibraryEntry, ModuleLibraryLineage, ModulePromptAssignmentPreset, ModuleStarterArtifactRef, PromptAssignmentTarget, PromptStripAssignment, PromptStripDefinition, PromptStripMergeMode, PromptStripVariableDefinition, RuntimeSettings, SerializedWorkspaceTab, SurfaceTruthSummary, Tab, WorkspaceTreeSnapshot, SubagentDefinition, SubagentGroupDefinition } from './types';
 
 export { normalizeVisibleArtifactType, normalizeVisibleExecutionProfile, normalizeWorkspaceArtifactType, normalizeWorkspaceExecutionProfile };
 
@@ -539,7 +539,7 @@ function collectModulePromptAssignmentsFromRuntime(settings: RuntimeSettings, ta
   if (!tabId) return [];
   const assignments = sanitizePromptStripAssignments(settings.promptStripAssignments, tabId);
   const validSubagents = new Set((settings.subagentLibrary || []).flatMap((group) => (group.agents || []).map((agent) => `${group.name}::${agent.name}`)));
-  return assignments.flatMap((assignment, index) => {
+  return assignments.flatMap<ModulePromptAssignmentPreset>((assignment, index) => {
     if (assignment.target.kind === 'graph' && assignment.target.tabId === tabId) {
       return [{
         id: assignment.id || `module_prompt_${index + 1}`,

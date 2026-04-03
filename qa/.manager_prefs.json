@@ -1,0 +1,16 @@
+{
+  "preview_build": false,
+  "no_browser": false,
+  "dry_run": false,
+  "desktop_shortcut": true,
+  "start_menu_shortcut": false,
+  "reinstall_node_modules": true,
+  "skip_frontend_build": false,
+  "skip_db_init": false,
+  "backend_port": 8000,
+  "frontend_port": 5000,
+  "wait_timeout_seconds": 35,
+  "remove_node_modules": false,
+  "clean_npm_cache": false,
+  "remove_shortcuts": true
+}

@@ -1562,7 +1562,7 @@ export default function StatePanelContent() {
                           <div className="flex flex-wrap gap-1 text-[10px]">
                             <span className="px-1.5 py-0.5 rounded border border-panel-border text-slate-300">origin: {strip.origin}</span>
                             {strip.tags.map((tag) => <span key={tag} className="px-1.5 py-0.5 rounded border border-cyan-500/20 bg-cyan-500/10 text-cyan-200">#{tag}</span>)}
-                            {(strip.variables || []).map((variable) => <span key={variable.name} className="px-1.5 py-0.5 rounded border border-emerald-500/20 bg-emerald-500/10 text-emerald-200">{{{{ {variable.name} }}}}</span>)}
+                            {(strip.variables || []).map((variable) => <span key={variable.name} className="px-1.5 py-0.5 rounded border border-emerald-500/20 bg-emerald-500/10 text-emerald-200">{'{{'}{variable.name}{'}}'}</span>)}
                           </div>
                           <div className="text-[10px] text-slate-500">{summarizePromptBody(strip.body)}</div>
                         </div>
