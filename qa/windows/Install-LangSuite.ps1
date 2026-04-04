@@ -63,46 +63,6 @@ function Invoke-External {
     & $Action
 }
 
-function New-LangSuiteVenv {
-    if ($DryRun) {
-        Write-Step "[dry-run] Would create Python virtual environment in $VenvDir" 'Yellow'
-        return
-    }
-    if (Get-Command py -ErrorAction SilentlyContinue) {
-        & py -3 -m venv $VenvDir
-    } else {
-        & python -m venv $VenvDir
-    }
-}
-
-function Ensure-HealthyVenv {
-    $recreateReason = $null
-    if (-not (Test-Path $VenvDir)) {
-        Write-Step "Creating Python virtual environment in $VenvDir"
-        New-LangSuiteVenv
-        return
-    }
-    if (-not (Test-Path $PythonExe)) {
-        $recreateReason = 'virtual environment python.exe is missing'
-    } else {
-        try {
-            & $PythonExe -m pip --version *> $null
-        } catch {
-            $recreateReason = 'virtual environment pip is unhealthy'
-        }
-    }
-    if ($recreateReason) {
-        Write-Step "Recreating incomplete virtual environment: $recreateReason" 'Yellow'
-        if ($DryRun) {
-            Write-Step "[dry-run] Would remove $VenvDir" 'Yellow'
-            Write-Step "[dry-run] Would create Python virtual environment in $VenvDir" 'Yellow'
-        } else {
-            Remove-Item $VenvDir -Recurse -Force -ErrorAction SilentlyContinue
-            New-LangSuiteVenv
-        }
-    }
-}
-
 $LogPath = Initialize-LogFile -RequestedPath $LogPath -Header "LangSuite install log $(Get-Date -Format s)"
 
 Require-Path $RequirementsPath 'Backend requirements.txt'
@@ -112,7 +72,46 @@ if (-not (Get-Command py -ErrorAction SilentlyContinue) -and -not (Get-Command p
     throw "Python 3 was not found. Install Python or enable the 'py' launcher first."
 }
 
-Ensure-HealthyVenv
+function Ensure-VirtualEnv {
+    if ($DryRun) {
+        if (-not (Test-Path $VenvDir)) {
+            Write-Step "[dry-run] Would create Python virtual environment in $VenvDir" 'Yellow'
+        } elseif (-not (Test-Path $PythonExe)) {
+            Write-Step "[dry-run] Would recreate incomplete Python virtual environment in $VenvDir" 'Yellow'
+        } else {
+            Write-Step '[dry-run] Verified Python virtual environment shape.' 'Yellow'
+        }
+        return
+    }
+
+    $needsCreate = $false
+    if (-not (Test-Path $VenvDir)) {
+        $needsCreate = $true
+    } elseif (-not (Test-Path $PythonExe)) {
+        Write-Step "Existing virtual environment is incomplete (missing python.exe); recreating $VenvDir" 'Yellow'
+        Remove-Item $VenvDir -Recurse -Force
+        $needsCreate = $true
+    } else {
+        & $PythonExe -m pip --version *> $null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Step "Existing virtual environment is incomplete (pip unavailable); recreating $VenvDir" 'Yellow'
+            Remove-Item $VenvDir -Recurse -Force
+            $needsCreate = $true
+        }
+    }
+
+    if ($needsCreate) {
+        Invoke-External "Creating Python virtual environment in $VenvDir" {
+            if (Get-Command py -ErrorAction SilentlyContinue) {
+                & py -3 -m venv $VenvDir
+            } else {
+                & python -m venv $VenvDir
+            }
+        }
+    }
+}
+
+Ensure-VirtualEnv
 
 if (-not $DryRun) {
     Require-Path $PythonExe 'Virtual environment python.exe'

@@ -2,7 +2,7 @@ import { useEffect, useMemo, type ReactNode } from 'react';
 import { Info, ExternalLink, GitBranch, Layers3 } from 'lucide-react';
 import { useAppStore } from '../store';
 import { BLOCK_FAMILY_BADGE_CLASSES, BLOCK_FAMILY_LABELS, SUPPORT_STATUS_META, getInteroperabilityBridges, type ArtifactType, type ProjectMode } from '../capabilities';
-import { SUPPORT_STATUS_BADGE_CLASSES, SUPPORT_STATUS_LABELS, getNodeCapabilityInfo, getNodeRuntimeMeta, getRailBadgeClass, getRailLabel, inferNodeMaturity, MATURITY_BADGE_CLASSES, MATURITY_LABELS, SURFACE_BADGE_CLASSES, SURFACE_LABELS } from '../catalog';
+import { SUPPORT_STATUS_BADGE_CLASSES, SUPPORT_STATUS_LABELS, getNodeCapabilityInfo, getNodeRuntimeMeta, inferNodeMaturity, MATURITY_BADGE_CLASSES, MATURITY_LABELS, getRailBadgeClass, getRailLabel, SURFACE_BADGE_CLASSES, SURFACE_LABELS } from '../catalog';
 import { getLocalPromptForNode, getPromptAssignmentsForTarget, isPromptCapableNodeType, resolvePromptStripsForNodeTarget } from '../store/workspace';
 
 function BoolPill({ value }: { value: boolean }) {

@@ -1,0 +1,626 @@
+diff --git a/qa/linux/Stop-LangSuite.sh b/qa/linux/Stop-LangSuite.sh
+--- a/qa/linux/Stop-LangSuite.sh
++++ b/qa/linux/Stop-LangSuite.sh
+@@ -5,20 +5,43 @@
+ LOG_PATH=""
+ 
+ write_step() {
+-  printf '%s\n' "$1"
+-  if [[ -n "$LOG_PATH" ]]; then printf '%s\n' "$1" >> "$LOG_PATH"; fi
++  printf '%s
++' "$1"
++  if [[ -n "$LOG_PATH" ]]; then printf '%s
++' "$1" >> "$LOG_PATH"; fi
+ }
+ 
+ initialize_log_file() {
+   if [[ -z "$LOG_PATH" ]]; then return; fi
+   if [[ "$LOG_PATH" != /* ]]; then LOG_PATH="$PROJECT_ROOT/$LOG_PATH"; fi
+   mkdir -p "$(dirname "$LOG_PATH")"
+-  printf 'LangSuite stop log %s\n' "$(date -Iseconds)" > "$LOG_PATH"
++  printf 'LangSuite stop log %s
++' "$(date -Iseconds)" > "$LOG_PATH"
+ }
+ 
+-pattern_matches() {
+-  local args="$1"
+-  [[ "$args" == *"$PROJECT_ROOT"* ]] && [[ "$args" =~ uvicorn|vite|node[[:space:]].*vite|npm[[:space:]]+run[[:space:]]+dev|npm[[:space:]]+run[[:space:]]+preview ]]
++collect_descendants() {
++  local parent_pid="$1"
++  local child
++  while IFS= read -r child; do
++    child="${child//[[:space:]]/}"
++    [[ -z "$child" ]] && continue
++    if [[ -z "${protected_pids[$child]:-}" && -z "${pid_seen[$child]:-}" ]]; then
++      pid_seen[$child]=1
++      pids+=("$child")
++      collect_descendants "$child"
++    fi
++  done < <(ps -o pid= --ppid "$parent_pid" 2>/dev/null || true)
++}
++
++collect_protected_ancestors() {
++  local current="$$"
++  while [[ -n "$current" && "$current" =~ ^[0-9]+$ && "$current" != "0" ]]; do
++    if [[ -n "${protected_pids[$current]:-}" ]]; then
++      break
++    fi
++    protected_pids[$current]=1
++    current=$(ps -o ppid= -p "$current" 2>/dev/null | tr -d '[:space:]')
++  done
+ }
+ 
+ while [[ $# -gt 0 ]]; do
+@@ -32,78 +55,45 @@
+ 
+ initialize_log_file
+ write_step 'Stopping obvious local LangSuite processes...'
+-
+-declare -A protected=()
+-pid_cursor=$$
+-while [[ -n "$pid_cursor" && "$pid_cursor" != "0" ]]; do
+-  protected[$pid_cursor]=1
+-  parent_pid=$(ps -o ppid= -p "$pid_cursor" 2>/dev/null | tr -d '[:space:]')
+-  [[ -z "$parent_pid" || "$parent_pid" == "$pid_cursor" ]] && break
+-  pid_cursor="$parent_pid"
+-done
+-
+-declare -A args_by_pid=()
+-declare -A parent_by_pid=()
+-declare -A root_candidates=()
+-while IFS= read -r row; do
+-  [[ -z "$row" ]] && continue
+-  pid=$(awk '{print $1}' <<<"$row")
+-  ppid=$(awk '{print $2}' <<<"$row")
+-  args=${row#"$pid"}
+-  args=${args#" $ppid"}
+-  args=${args# }
+-  [[ -z "$pid" ]] && continue
+-  parent_by_pid[$pid]="$ppid"
+-  args_by_pid[$pid]="$args"
+-  if [[ -z "${protected[$pid]:-}" ]] && pattern_matches "$args"; then
+-    root_candidates[$pid]=1
+-  fi
+-done < <(ps -eo pid=,ppid=,args=)
+-
+-if [[ ${#root_candidates[@]} -eq 0 ]]; then
++mapfile -t candidate_rows < <(ps -eo pid=,args= | awk -v root="$PROJECT_ROOT" 'index($0, root) > 0 && ($0 ~ /uvicorn/ || $0 ~ /vite/ || $0 ~ /node .*vite/ || $0 ~ /npm run dev/ || $0 ~ /npm run preview/) {print $1}')
++if [[ ${#candidate_rows[@]} -eq 0 ]]; then
+   write_step 'No obvious LangSuite backend/frontend processes were found.'
+   exit 0
+ fi
+ 
+-declare -A stop_seen=()
+-stop_order=()
+-collect_descendants() {
+-  local root_pid="$1"
+-  local child_pid
+-  while IFS= read -r child_pid; do
+-    [[ -z "$child_pid" ]] && continue
+-    [[ -n "${protected[$child_pid]:-}" ]] && continue
+-    [[ -n "${stop_seen[$child_pid]:-}" ]] && continue
+-    stop_seen[$child_pid]=1
+-    collect_descendants "$child_pid"
+-    stop_order+=("$child_pid")
+-  done < <(printf '%s\n' "${!parent_by_pid[@]}" | while IFS= read -r pid; do [[ "${parent_by_pid[$pid]}" == "$root_pid" ]] && printf '%s\n' "$pid"; done)
+-}
+-
+-for pid in "${!root_candidates[@]}"; do
+-  collect_descendants "$pid"
+-  if [[ -z "${protected[$pid]:-}" && -z "${stop_seen[$pid]:-}" ]]; then
+-    stop_seen[$pid]=1
+-    stop_order+=("$pid")
++declare -A pid_seen=()
++declare -A protected_pids=()
++collect_protected_ancestors
++pids=()
++for pid in "${candidate_rows[@]}"; do
++  pid="${pid//[[:space:]]/}"
++  [[ -z "$pid" ]] && continue
++  [[ -n "${protected_pids[$pid]:-}" ]] && continue
++  if [[ -z "${pid_seen[$pid]:-}" ]]; then
++    pid_seen[$pid]=1
++    pids+=("$pid")
++    collect_descendants "$pid"
+   fi
+ done
+ 
+-if [[ ${#stop_order[@]} -eq 0 ]]; then
+-  write_step 'No obvious LangSuite backend/frontend processes remained after ancestry protection.'
++if [[ ${#pids[@]} -eq 0 ]]; then
++  write_step 'No obvious LangSuite backend/frontend processes were found after excluding the current shell ancestry.'
+   exit 0
+ fi
+ 
+ if [[ $DRY_RUN -eq 1 ]]; then
+-  for pid in "${stop_order[@]}"; do write_step "[dry-run] Would stop descendant-tree process $pid"; done
++  for pid in "${pids[@]}"; do write_step "[dry-run] Would stop process $pid"; done
+   write_step 'Dry-run mode only described the stop plan.'
+   exit 0
+ fi
+ 
+-for pid in "${stop_order[@]}"; do
++for (( idx=${#pids[@]}-1; idx>=0; idx-- )); do
++  pid="${pids[$idx]}"
+   kill -TERM "$pid" 2>/dev/null || true
+ done
+ sleep 1
+-for pid in "${stop_order[@]}"; do
++for (( idx=${#pids[@]}-1; idx>=0; idx-- )); do
++  pid="${pids[$idx]}"
+   if kill -0 "$pid" 2>/dev/null; then
+     kill -KILL "$pid" 2>/dev/null || true
+   fi
+@@ -111,11 +101,11 @@
+ sleep 0.2
+ 
+ stopped_any=0
+-for pid in "${stop_order[@]}"; do
++for pid in "${pids[@]}"; do
+   if kill -0 "$pid" 2>/dev/null; then
+     write_step "Process $pid is still alive after stop attempts."
+   else
+-    write_step "Stopped descendant-tree process $pid"
++    write_step "Stopped process $pid"
+     stopped_any=1
+   fi
+ done
+diff --git a/qa/linux/Install-LangSuite.sh b/qa/linux/Install-LangSuite.sh
+--- a/qa/linux/Install-LangSuite.sh
++++ b/qa/linux/Install-LangSuite.sh
+@@ -26,8 +26,12 @@
+   mkdir -p "$(dirname "$LOG_PATH")"
+   printf 'LangSuite install log %s\n' "$(date -Iseconds)" > "$LOG_PATH"
+ }
+-require_path() { [[ -e "$1" ]] || { echo "$2 was not found at $1" >&2; exit 1; }; }
+-require_command() { command -v "$1" >/dev/null 2>&1 || { echo "Required command '$1' was not found in PATH." >&2; exit 1; }; }
++require_path() {
++  [[ -e "$1" ]] || { echo "$2 was not found at $1" >&2; exit 1; }
++}
++require_command() {
++  command -v "$1" >/dev/null 2>&1 || { echo "Required command '$1' was not found in PATH." >&2; exit 1; }
++}
+ invoke_external() {
+   local label="$1"; shift
+   write_step "$label"
+@@ -36,36 +40,6 @@
+     return
+   fi
+   "$@"
+-}
+-create_venv() {
+-  if [[ $DRY_RUN -eq 1 ]]; then
+-    write_step "[dry-run] Would create Python virtual environment in $VENV_DIR"
+-    return
+-  fi
+-  if command -v python3 >/dev/null 2>&1; then python3 -m venv "$VENV_DIR"; else python -m venv "$VENV_DIR"; fi
+-}
+-ensure_healthy_venv() {
+-  local recreate_reason=""
+-  if [[ ! -d "$VENV_DIR" ]]; then
+-    write_step "Creating Python virtual environment in $VENV_DIR"
+-    create_venv
+-    return
+-  fi
+-  if [[ ! -x "$PYTHON_EXE" ]]; then
+-    recreate_reason='virtual environment python is missing'
+-  elif ! "$PYTHON_EXE" -m pip --version >/dev/null 2>&1; then
+-    recreate_reason='virtual environment pip is unhealthy'
+-  fi
+-  if [[ -n "$recreate_reason" ]]; then
+-    write_step "Recreating incomplete virtual environment: $recreate_reason"
+-    if [[ $DRY_RUN -eq 1 ]]; then
+-      write_step "[dry-run] Would remove $VENV_DIR"
+-      write_step "[dry-run] Would create Python virtual environment in $VENV_DIR"
+-    else
+-      rm -rf "$VENV_DIR"
+-      create_venv
+-    fi
+-  fi
+ }
+ while [[ $# -gt 0 ]]; do
+   case "$1" in
+@@ -88,7 +62,34 @@
+   echo "Python 3 was not found. Install Python or ensure python3 is in PATH." >&2
+   exit 1
+ fi
+-ensure_healthy_venv
++ensure_virtualenv() {
++  if [[ $DRY_RUN -eq 1 ]]; then
++    if [[ ! -d "$VENV_DIR" ]]; then
++      write_step "[dry-run] Would create Python virtual environment in $VENV_DIR"
++    elif [[ ! -x "$PYTHON_EXE" ]]; then
++      write_step "[dry-run] Would recreate incomplete Python virtual environment in $VENV_DIR"
++    else
++      write_step '[dry-run] Verified Python virtual environment shape.'
++    fi
++    return
++  fi
++  recreate=0
++  if [[ ! -d "$VENV_DIR" ]]; then
++    recreate=1
++  elif [[ ! -x "$PYTHON_EXE" ]]; then
++    write_step "Existing virtual environment is incomplete (missing python executable); recreating $VENV_DIR"
++    rm -rf "$VENV_DIR"
++    recreate=1
++  elif ! "$PYTHON_EXE" -m pip --version >/dev/null 2>&1; then
++    write_step "Existing virtual environment is incomplete (pip unavailable); recreating $VENV_DIR"
++    rm -rf "$VENV_DIR"
++    recreate=1
++  fi
++  if [[ $recreate -eq 1 ]]; then
++    invoke_external "Creating Python virtual environment in $VENV_DIR" bash -lc "if command -v python3 >/dev/null 2>&1; then python3 -m venv '$VENV_DIR'; else python -m venv '$VENV_DIR'; fi"
++  fi
++}
++ensure_virtualenv
+ if [[ $DRY_RUN -eq 0 ]]; then require_path "$PYTHON_EXE" 'Virtual environment python'; fi
+ invoke_external 'Installing backend dependencies...' "$PYTHON_EXE" -m pip install --upgrade pip
+ invoke_external 'Installing backend requirements...' "$PYTHON_EXE" -m pip install -r "$REQUIREMENTS_PATH"
+diff --git a/qa/linux/HardReset-LangSuite.sh b/qa/linux/HardReset-LangSuite.sh
+--- a/qa/linux/HardReset-LangSuite.sh
++++ b/qa/linux/HardReset-LangSuite.sh
+@@ -2,6 +2,7 @@
+ set -euo pipefail
+ PROJECT_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+ CLIENT_DIR="$PROJECT_ROOT/client"
++VENV_DIR="$PROJECT_ROOT/.venv"
+ DRY_RUN=0
+ REMOVE_NODE_MODULES=0
+ CLEAN_NPM_CACHE=0
+@@ -19,7 +20,7 @@
+ remove_if_exists "$PROJECT_ROOT/static"
+ remove_if_exists "$CLIENT_DIR/tsconfig.tsbuildinfo"
+ remove_if_exists "$PROJECT_ROOT/.pytest_cache"
+-find "$PROJECT_ROOT" -path "$PROJECT_ROOT/.venv" -prune -o -type d -name '__pycache__' -print0 2>/dev/null | while IFS= read -r -d '' d; do remove_if_exists "$d"; done
++find "$PROJECT_ROOT" -path "$VENV_DIR" -prune -o -type d -name '__pycache__' -print0 2>/dev/null | while IFS= read -r -d '' d; do remove_if_exists "$d"; done
+ if [[ -d "$PROJECT_ROOT/db" ]]; then find "$PROJECT_ROOT/db" -maxdepth 1 -name 'langgraph_builder.db*' -print0 2>/dev/null | while IFS= read -r -d '' f; do remove_if_exists "$f"; done; fi
+ if [[ -d "$PROJECT_ROOT/data" ]]; then find "$PROJECT_ROOT/data" -maxdepth 1 -name '*.db*' -print0 2>/dev/null | while IFS= read -r -d '' f; do remove_if_exists "$f"; done; fi
+ if [[ $REMOVE_NODE_MODULES -eq 1 ]]; then remove_if_exists "$CLIENT_DIR/node_modules"; fi
+diff --git a/qa/windows/Install-LangSuite.ps1 b/qa/windows/Install-LangSuite.ps1
+--- a/qa/windows/Install-LangSuite.ps1
++++ b/qa/windows/Install-LangSuite.ps1
+@@ -63,46 +63,6 @@
+     & $Action
+ }
+ 
+-function New-LangSuiteVenv {
+-    if ($DryRun) {
+-        Write-Step "[dry-run] Would create Python virtual environment in $VenvDir" 'Yellow'
+-        return
+-    }
+-    if (Get-Command py -ErrorAction SilentlyContinue) {
+-        & py -3 -m venv $VenvDir
+-    } else {
+-        & python -m venv $VenvDir
+-    }
+-}
+-
+-function Ensure-HealthyVenv {
+-    $recreateReason = $null
+-    if (-not (Test-Path $VenvDir)) {
+-        Write-Step "Creating Python virtual environment in $VenvDir"
+-        New-LangSuiteVenv
+-        return
+-    }
+-    if (-not (Test-Path $PythonExe)) {
+-        $recreateReason = 'virtual environment python.exe is missing'
+-    } else {
+-        try {
+-            & $PythonExe -m pip --version *> $null
+-        } catch {
+-            $recreateReason = 'virtual environment pip is unhealthy'
+-        }
+-    }
+-    if ($recreateReason) {
+-        Write-Step "Recreating incomplete virtual environment: $recreateReason" 'Yellow'
+-        if ($DryRun) {
+-            Write-Step "[dry-run] Would remove $VenvDir" 'Yellow'
+-            Write-Step "[dry-run] Would create Python virtual environment in $VenvDir" 'Yellow'
+-        } else {
+-            Remove-Item $VenvDir -Recurse -Force -ErrorAction SilentlyContinue
+-            New-LangSuiteVenv
+-        }
+-    }
+-}
+-
+ $LogPath = Initialize-LogFile -RequestedPath $LogPath -Header "LangSuite install log $(Get-Date -Format s)"
+ 
+ Require-Path $RequirementsPath 'Backend requirements.txt'
+@@ -112,7 +72,46 @@
+     throw "Python 3 was not found. Install Python or enable the 'py' launcher first."
+ }
+ 
+-Ensure-HealthyVenv
++function Ensure-VirtualEnv {
++    if ($DryRun) {
++        if (-not (Test-Path $VenvDir)) {
++            Write-Step "[dry-run] Would create Python virtual environment in $VenvDir" 'Yellow'
++        } elseif (-not (Test-Path $PythonExe)) {
++            Write-Step "[dry-run] Would recreate incomplete Python virtual environment in $VenvDir" 'Yellow'
++        } else {
++            Write-Step '[dry-run] Verified Python virtual environment shape.' 'Yellow'
++        }
++        return
++    }
++
++    $needsCreate = $false
++    if (-not (Test-Path $VenvDir)) {
++        $needsCreate = $true
++    } elseif (-not (Test-Path $PythonExe)) {
++        Write-Step "Existing virtual environment is incomplete (missing python.exe); recreating $VenvDir" 'Yellow'
++        Remove-Item $VenvDir -Recurse -Force
++        $needsCreate = $true
++    } else {
++        & $PythonExe -m pip --version *> $null
++        if ($LASTEXITCODE -ne 0) {
++            Write-Step "Existing virtual environment is incomplete (pip unavailable); recreating $VenvDir" 'Yellow'
++            Remove-Item $VenvDir -Recurse -Force
++            $needsCreate = $true
++        }
++    }
++
++    if ($needsCreate) {
++        Invoke-External "Creating Python virtual environment in $VenvDir" {
++            if (Get-Command py -ErrorAction SilentlyContinue) {
++                & py -3 -m venv $VenvDir
++            } else {
++                & python -m venv $VenvDir
++            }
++        }
++    }
++}
++
++Ensure-VirtualEnv
+ 
+ if (-not $DryRun) {
+     Require-Path $PythonExe 'Virtual environment python.exe'
+diff --git a/client/src/catalog.ts b/client/src/catalog.ts
+--- a/client/src/catalog.ts
++++ b/client/src/catalog.ts
+@@ -131,21 +131,17 @@
+   adapter: 'text-amber-300 bg-amber-500/10 border-amber-500/20',
+   services: 'text-slate-300 bg-slate-500/10 border-slate-500/20',
+ };
+-const FALLBACK_RAIL_ID: RailId = 'trunk';
+ 
+ export function normalizeRailId(value: unknown): RailId {
+-  if (typeof value === 'string' && Object.prototype.hasOwnProperty.call(RAIL_META, value)) {
+-    return value as RailId;
+-  }
+-  return FALLBACK_RAIL_ID;
++  return typeof value === 'string' && value in RAIL_LABELS ? (value as RailId) : 'trunk';
+ }
+ 
+ export function getRailLabel(value: unknown): string {
+-  return RAIL_LABELS[normalizeRailId(value)];
++  return RAIL_LABELS[normalizeRailId(value)] || RAIL_LABELS.trunk;
+ }
+ 
+ export function getRailBadgeClass(value: unknown): string {
+-  return RAIL_BADGE_CLASSES[normalizeRailId(value)];
++  return RAIL_BADGE_CLASSES[normalizeRailId(value)] || RAIL_BADGE_CLASSES.trunk;
+ }
+ 
+ export const KIND_ORDER: BuilderArtifactKind[] = ['primitive', 'composite', 'suite', 'reference'];
+diff --git a/client/src/components/CapabilityInspectorSection.tsx b/client/src/components/CapabilityInspectorSection.tsx
+--- a/client/src/components/CapabilityInspectorSection.tsx
++++ b/client/src/components/CapabilityInspectorSection.tsx
+@@ -2,7 +2,7 @@
+ import { Info, ExternalLink, GitBranch, Layers3 } from 'lucide-react';
+ import { useAppStore } from '../store';
+ import { BLOCK_FAMILY_BADGE_CLASSES, BLOCK_FAMILY_LABELS, SUPPORT_STATUS_META, getInteroperabilityBridges, type ArtifactType, type ProjectMode } from '../capabilities';
+-import { SUPPORT_STATUS_BADGE_CLASSES, SUPPORT_STATUS_LABELS, getNodeCapabilityInfo, getNodeRuntimeMeta, getRailBadgeClass, getRailLabel, inferNodeMaturity, MATURITY_BADGE_CLASSES, MATURITY_LABELS, SURFACE_BADGE_CLASSES, SURFACE_LABELS } from '../catalog';
++import { SUPPORT_STATUS_BADGE_CLASSES, SUPPORT_STATUS_LABELS, getNodeCapabilityInfo, getNodeRuntimeMeta, inferNodeMaturity, MATURITY_BADGE_CLASSES, MATURITY_LABELS, getRailBadgeClass, getRailLabel, SURFACE_BADGE_CLASSES, SURFACE_LABELS } from '../catalog';
+ import { getLocalPromptForNode, getPromptAssignmentsForTarget, isPromptCapableNodeType, resolvePromptStripsForNodeTarget } from '../store/workspace';
+ 
+ function BoolPill({ value }: { value: boolean }) {
+diff --git a/client/src/components/artifacts/ArtifactLibrarySection.tsx b/client/src/components/artifacts/ArtifactLibrarySection.tsx
+--- a/client/src/components/artifacts/ArtifactLibrarySection.tsx
++++ b/client/src/components/artifacts/ArtifactLibrarySection.tsx
+@@ -164,25 +164,6 @@
+           placeholder="Filter the library..."
+           className="w-full bg-black/20 border border-panel-border rounded px-2 py-1.5 text-[11px] text-white placeholder:text-slate-600 outline-none focus:border-blue-500"
+         />
+-        {items.some((item) => item.id === 'jdr_solo_session_starter') && activeProjectMode === 'langgraph' && (
+-          <div className="rounded-lg border border-fuchsia-500/20 bg-fuchsia-500/10 px-2.5 py-2 text-[10px] leading-5 text-fuchsia-100">
+-            <div>Tabletop demo: <strong>Tabletop Solo Session Starter</strong> opens on the LangGraph surface with GM, cast, packs, dice, and a rules helper.</div>
+-            <div className="mt-2 flex flex-wrap gap-2">
+-              <button
+-                onClick={() => window.dispatchEvent(new CustomEvent('langsuite:open-tabletop-starter'))}
+-                className="rounded-md border border-fuchsia-500/25 bg-fuchsia-500/12 px-2 py-1 text-[10px] font-medium text-fuchsia-50 hover:bg-fuchsia-500/18 transition-all"
+-              >
+-                Guided setup
+-              </button>
+-              <button
+-                onClick={() => void openArtifact('graph', 'jdr_solo_session_starter')}
+-                className="rounded-md border border-panel-border bg-black/20 px-2 py-1 text-[10px] text-slate-100 hover:bg-panel-hover transition-all"
+-              >
+-                Open starter
+-              </button>
+-            </div>
+-          </div>
+-        )}
+       </div>
+ 
+       <div className="px-3 pb-3 space-y-3 overflow-auto max-h-[340px] scrollbar-thin">
+@@ -222,7 +203,7 @@
+                       <div className="flex items-center gap-2 flex-wrap">
+                         <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide border ${meta.accent}`}>{item.kind}</span>
+                         <SurfacePill level={surfaceLevel} />
+-                        <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide border inline-flex items-center gap-1 ${getRailBadgeClass(item.rail)}`}><Waypoints size={10} />{getRailLabel(item.rail)}</span>
++                        {item.rail && <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide border inline-flex items-center gap-1 ${getRailBadgeClass(item.rail)}`}><Waypoints size={10} />{getRailLabel(item.rail)}</span>}
+                         {item.built_in && <span className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">starter</span>}
+                         {typeof item.compileSafe === 'boolean' && <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide border ${item.compileSafe ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20' : 'bg-red-500/10 text-red-300 border-red-500/20'}`}>{item.compileSafe ? 'compile-safe' : 'not compile-safe'}</span>}
+                         {typeof item.editorOnly === 'boolean' && <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide border ${item.editorOnly ? 'bg-amber-500/10 text-amber-300 border-amber-500/20' : 'bg-cyan-500/10 text-cyan-300 border-cyan-500/20'}`}>{item.editorOnly ? 'editor-first' : 'runtime-enabled'}</span>}
+diff --git a/tests/test_v96_metadata_integrity_pass.py b/tests/test_v96_metadata_integrity_pass.py
+--- a/tests/test_v96_metadata_integrity_pass.py
++++ b/tests/test_v96_metadata_integrity_pass.py
+@@ -1,62 +1,96 @@
+ from __future__ import annotations
+ 
+ import json
++import sys
+ from pathlib import Path
+ 
+ ROOT = Path(__file__).resolve().parents[1]
+-MATRIX_PATH = ROOT / 'client' / 'src' / 'capabilityMatrix.json'
+-CATALOG_TS = ROOT / 'client' / 'src' / 'catalog.ts'
+-INSPECTOR_TS = ROOT / 'client' / 'src' / 'components' / 'CapabilityInspectorSection.tsx'
+-ARTIFACT_LIBRARY_TS = ROOT / 'client' / 'src' / 'components' / 'artifacts' / 'ArtifactLibrarySection.tsx'
+-CAPABILITIES_TS = ROOT / 'client' / 'src' / 'capabilities.ts'
++if str(ROOT) not in sys.path:
++    sys.path.insert(0, str(ROOT))
++
++from core.capability_matrix import rail_meta
++from core.artifact_registry import list_artifacts
++
++CAP_MATRIX = ROOT / 'client' / 'src' / 'capabilityMatrix.json'
++CATALOG = ROOT / 'client' / 'src' / 'catalog.ts'
++BLOCKS = ROOT / 'client' / 'src' / 'components' / 'BlocksPanelContent.tsx'
++INSPECTOR = ROOT / 'client' / 'src' / 'components' / 'CapabilityInspectorSection.tsx'
++ARTIFACT_LIBRARY = ROOT / 'client' / 'src' / 'components' / 'artifacts' / 'ArtifactLibrarySection.tsx'
+ 
+ 
+-def _matrix() -> dict:
+-    return json.loads(MATRIX_PATH.read_text(encoding='utf-8'))
++def _load_matrix() -> dict:
++    return json.loads(CAP_MATRIX.read_text(encoding='utf-8'))
+ 
+ 
+ def test_canonical_rail_taxonomy_matches_shared_json_and_backend() -> None:
+-    matrix = _matrix()
+-    canonical = {'trunk', 'composition', 'agentic', 'adapter', 'services'}
+-    assert set(matrix.get('rails', {}).keys()) == canonical
++    matrix = _load_matrix()
++    json_rails = tuple(matrix['rails'].keys())
++    backend_rails = tuple(rail_meta().keys())
++    assert backend_rails == json_rails
++    assert json_rails == ('trunk', 'composition', 'agentic', 'adapter', 'services')
+ 
+ 
+ def test_no_matrix_entry_uses_noncanonical_rail_values() -> None:
+-    matrix = _matrix()
+-    canonical = set(matrix.get('rails', {}).keys())
+-    for section_name in ('artifactKinds', 'executionProfiles', 'projectModes', 'nodeTypes'):
+-        section = matrix.get(section_name, {})
+-        assert isinstance(section, dict)
+-        for key, meta in section.items():
+-            if isinstance(meta, dict) and 'rail' in meta:
+-                assert meta['rail'] in canonical, f'{section_name}:{key} uses noncanonical rail {meta["rail"]!r}'
++    matrix = _load_matrix()
++    rails = set(matrix['rails'])
++    invalid: list[tuple[str, str, object]] = []
++    for section in ('artifactKinds', 'executionProfiles', 'projectModes', 'nodeTypes'):
++        for key, value in matrix.get(section, {}).items():
++            if not isinstance(value, dict) or 'rail' not in value:
++                continue
++            if value['rail'] not in rails:
++                invalid.append((section, key, value['rail']))
++    assert invalid == []
+ 
+ 
+ def test_visible_runtime_palette_surfaces_resolve_to_known_rails_even_when_node_rail_is_omitted() -> None:
+-    matrix = _matrix()
+-    canonical = set(matrix.get('rails', {}).keys())
+-    node_defaults = matrix.get('nodeDefaults', {})
+-    node_types = matrix.get('nodeTypes', {})
+-    for key in ('memory_store_read', 'memoryreader', 'memorywriter'):
+-        node = node_types.get(key, {})
+-        resolved = node.get('rail') or node_defaults.get('rail')
+-        assert resolved in canonical
++    matrix = _load_matrix()
++    rails = set(matrix['rails'])
++    runtime_backed = set(matrix.get('runtimeBackedNodeTypes', []))
++    palette_hidden = set(matrix.get('paletteHiddenNodeTypes', []))
++    default_rail = matrix['nodeDefaults']['rail']
++    assert default_rail in rails
++
++    invalid_visible_nodes: list[tuple[str, object]] = []
++    for node_type, meta in matrix.get('nodeTypes', {}).items():
++        if not isinstance(meta, dict):
++            continue
++        visible = (
++            node_type in runtime_backed
++            and node_type not in palette_hidden
++            and not bool(meta.get('internalOnly'))
++            and str(meta.get('surfaceLevel', matrix['nodeDefaults']['surfaceLevel'])) != 'internal'
++        )
++        if not visible:
++            continue
++        resolved_rail = meta.get('rail', default_rail)
++        if resolved_rail not in rails:
++            invalid_visible_nodes.append((node_type, resolved_rail))
++    assert invalid_visible_nodes == []
+ 
+ 
+-def test_catalog_exposes_fail_soft_rail_helpers() -> None:
+-    catalog_text = CATALOG_TS.read_text(encoding='utf-8')
+-    assert 'normalizeRailId' in catalog_text
+-    assert 'getRailLabel' in catalog_text
+-    assert 'getRailBadgeClass' in catalog_text
+-    assert "FALLBACK_RAIL_ID: RailId = 'trunk'" in catalog_text
++def test_obvious_panels_use_fail_soft_rail_rendering_paths() -> None:
++    catalog = CATALOG.read_text(encoding='utf-8')
++    assert 'export function normalizeRailId(value: unknown): RailId {' in catalog
++    assert "return typeof value === 'string' && value in RAIL_LABELS ? (value as RailId) : 'trunk';" in catalog
++    assert 'export function getRailLabel(value: unknown): string {' in catalog
++    assert 'export function getRailBadgeClass(value: unknown): string {' in catalog
++
++    blocks = BLOCKS.read_text(encoding='utf-8')
++    assert "const railKey = (capability.rail && capability.rail in RAIL_LABELS ? capability.rail : 'trunk')" in blocks
++
++    inspector = INSPECTOR.read_text(encoding='utf-8')
++    assert 'getRailBadgeClass(capability.rail)' in inspector
++    assert 'getRailLabel(capability.rail)' in inspector
++
++    artifact_library = ARTIFACT_LIBRARY.read_text(encoding='utf-8')
++    assert 'getRailBadgeClass(item.rail)' in artifact_library
++    assert 'getRailLabel(item.rail)' in artifact_library
+ 
+ 
+-def test_obvious_panels_use_fail_soft_rail_helpers() -> None:
+-    inspector_text = INSPECTOR_TS.read_text(encoding='utf-8')
+-    library_text = ARTIFACT_LIBRARY_TS.read_text(encoding='utf-8')
+-    assert 'getRailLabel' in inspector_text and 'getRailBadgeClass' in inspector_text
+-    assert 'getRailLabel' in library_text and 'getRailBadgeClass' in library_text
+-    assert 'RAIL_LABELS[' not in inspector_text
+-    assert 'RAIL_BADGE_CLASSES[' not in inspector_text
+-    assert 'RAIL_LABELS[' not in library_text
+-    assert 'RAIL_BADGE_CLASSES[' not in library_text
++def test_visible_artifact_library_entries_use_known_rails() -> None:
++    valid_rails = set(rail_meta())
++    for include_hidden in (False, True):
++        items = list_artifacts(include_hidden=include_hidden)
++        bad = [(item['id'], item.get('rail')) for item in items if item.get('rail') is not None and item.get('rail') not in valid_rails]
++        assert bad == []
+diff --git a/tests/linux_qa_sanity.py b/tests/linux_qa_sanity.py
+--- a/tests/linux_qa_sanity.py
++++ b/tests/linux_qa_sanity.py
+@@ -51,7 +51,8 @@
+     expect('npm ci' in install_text or 'npm install' in install_text, 'installer does not install frontend deps')
+     expect('npm run build' in install_text, 'installer does not build frontend')
+     expect('CreateShortcuts-LangSuite.sh' in install_text, 'installer does not offer shortcut creation')
+-    expect('pip --version' in install_text, 'installer does not validate venv pip health before reuse')
++    expect('ensure_virtualenv' in install_text, 'installer does not repair incomplete virtual environments')
++    expect('pip --version' in install_text, 'installer does not verify pip in the virtual environment')
+ 
+     launch_text = (QA / 'Launch-LangSuite.sh').read_text(encoding='utf-8')
+     expect('uvicorn main:app' in launch_text, 'launcher does not start backend')
+@@ -64,12 +65,13 @@
+     stop_text = (QA / 'Stop-LangSuite.sh').read_text(encoding='utf-8')
+     expect('Stopping obvious local LangSuite processes' in stop_text, 'stop script does not announce process stop')
+     expect('ps -eo' in stop_text, 'stop script does not inspect local processes')
+-    expect('node .*vite' in stop_text or 'node[[:space:]].*vite' in stop_text, 'stop script does not cover node/vite descendants')
+-    expect('collect_descendants' in stop_text, 'stop script does not walk descendant trees')
+-    expect('protected[$pid_cursor]' in stop_text or 'ancestry protection' in stop_text.lower(), 'stop script does not protect the current shell ancestry')
++    expect('node .*vite' in stop_text, 'stop script does not cover node/vite descendants')
++    expect('collect_descendants' in stop_text, 'stop script does not collect descendant processes')
++    expect('collect_protected_ancestors' in stop_text, 'stop script does not protect its own ancestor processes')
++    expect('kill -TERM --' not in stop_text, 'stop script still kills whole process groups')
+ 
+     hard_reset_text = (QA / 'HardReset-LangSuite.sh').read_text(encoding='utf-8')
+-    expect('.venv' in hard_reset_text and '-prune' in hard_reset_text, 'hard reset does not prune .venv during cache cleanup')
++    expect('-path "$VENV_DIR" -prune' in hard_reset_text, 'hard reset still descends into .venv __pycache__ trees')
+ 
+     uninstall_text = (QA / 'Uninstall-LangSuite.sh').read_text(encoding='utf-8')
+     expect('HardReset-LangSuite.sh' in uninstall_text, 'uninstaller does not chain through hard reset')
