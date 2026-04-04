@@ -52,6 +52,8 @@ def run():
     expect('npm ci' in install_text or 'npm install' in install_text, 'installer does not install frontend deps')
     expect('npm run build' in install_text, 'installer does not build frontend')
     expect('CreateShortcuts-LangSuite.ps1' in install_text, 'installer does not offer shortcut creation')
+    expect('Ensure-VirtualEnv' in install_text, 'installer does not repair incomplete virtual environments')
+    expect('-m pip --version' in install_text, 'installer does not verify pip in the virtual environment')
 
     launch_text = (QA / 'Launch-LangSuite.ps1').read_text(encoding='utf-8')
     expect("'uvicorn', 'main:app'" in launch_text or "'uvicorn', 'main:app'," in launch_text, 'launcher does not start backend')
@@ -67,6 +69,7 @@ def run():
     expect('Stopping obvious local LangSuite processes' in stop_text, 'stop script does not announce process stop')
     expect('Win32_Process' in stop_text, 'stop script does not inspect Windows processes')
     expect('node(.exe)? .*vite' in stop_text, 'stop script does not cover node/vite descendants')
+    expect('Get-ProtectedAncestorProcessIds' in stop_text, 'stop script does not protect its own ancestor processes')
 
     uninstall_text = (QA / 'Uninstall-LangSuite.ps1').read_text(encoding='utf-8')
     expect('HardReset-LangSuite.ps1' in uninstall_text, 'uninstaller does not chain through hard reset')

@@ -131,6 +131,19 @@ export const RAIL_BADGE_CLASSES: Record<RailId, string> = {
   adapter: 'text-amber-300 bg-amber-500/10 border-amber-500/20',
   services: 'text-slate-300 bg-slate-500/10 border-slate-500/20',
 };
+
+export function normalizeRailId(value: unknown): RailId {
+  return typeof value === 'string' && value in RAIL_LABELS ? (value as RailId) : 'trunk';
+}
+
+export function getRailLabel(value: unknown): string {
+  return RAIL_LABELS[normalizeRailId(value)] || RAIL_LABELS.trunk;
+}
+
+export function getRailBadgeClass(value: unknown): string {
+  return RAIL_BADGE_CLASSES[normalizeRailId(value)] || RAIL_BADGE_CLASSES.trunk;
+}
+
 export const KIND_ORDER: BuilderArtifactKind[] = ['primitive', 'composite', 'suite', 'reference'];
 export { BLOCK_FAMILY_BADGE_CLASSES, BLOCK_FAMILY_LABELS };
 

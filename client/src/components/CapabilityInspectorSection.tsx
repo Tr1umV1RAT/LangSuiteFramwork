@@ -2,7 +2,7 @@ import { useEffect, useMemo, type ReactNode } from 'react';
 import { Info, ExternalLink, GitBranch, Layers3 } from 'lucide-react';
 import { useAppStore } from '../store';
 import { BLOCK_FAMILY_BADGE_CLASSES, BLOCK_FAMILY_LABELS, SUPPORT_STATUS_META, getInteroperabilityBridges, type ArtifactType, type ProjectMode } from '../capabilities';
-import { SUPPORT_STATUS_BADGE_CLASSES, SUPPORT_STATUS_LABELS, getNodeCapabilityInfo, getNodeRuntimeMeta, inferNodeMaturity, MATURITY_BADGE_CLASSES, MATURITY_LABELS, RAIL_BADGE_CLASSES, RAIL_LABELS, SURFACE_BADGE_CLASSES, SURFACE_LABELS } from '../catalog';
+import { SUPPORT_STATUS_BADGE_CLASSES, SUPPORT_STATUS_LABELS, getNodeCapabilityInfo, getNodeRuntimeMeta, inferNodeMaturity, MATURITY_BADGE_CLASSES, MATURITY_LABELS, getRailBadgeClass, getRailLabel, SURFACE_BADGE_CLASSES, SURFACE_LABELS } from '../catalog';
 import { getLocalPromptForNode, getPromptAssignmentsForTarget, isPromptCapableNodeType, resolvePromptStripsForNodeTarget } from '../store/workspace';
 
 function BoolPill({ value }: { value: boolean }) {
@@ -123,7 +123,7 @@ export default function CapabilityInspectorSection() {
             <div className="space-y-2 rounded-lg border border-panel-border bg-black/20 p-2.5">
               <Row label="Canonical node" value={<code className="text-[10px] text-cyan-300">{capability.canonicalNodeType}</code>} />
               <Row label="Compile target" value={<code className="text-[10px] text-violet-300">{capability.compileTargetType}</code>} />
-              <Row label="Rail" value={<span className={`px-1.5 py-0.5 rounded text-[10px] border ${RAIL_BADGE_CLASSES[capability.rail]}`}>{RAIL_LABELS[capability.rail]}</span>} />
+              <Row label="Rail" value={<span className={`px-1.5 py-0.5 rounded text-[10px] border ${getRailBadgeClass(capability.rail)}`}>{getRailLabel(capability.rail)}</span>} />
               <Row label="Block family" value={<span className={`px-1.5 py-0.5 rounded text-[10px] border ${BLOCK_FAMILY_BADGE_CLASSES[capability.blockFamily]}`}>{BLOCK_FAMILY_LABELS[capability.blockFamily]}</span>} />
               <Row label="Surface" value={<span className={`px-1.5 py-0.5 rounded text-[10px] border ${SURFACE_BADGE_CLASSES[capability.surfaceLevel]}`}>{SURFACE_LABELS[capability.surfaceLevel]}</span>} />
               {maturity && <Row label="Maturity" value={<span className={`px-1.5 py-0.5 rounded text-[10px] border ${MATURITY_BADGE_CLASSES[maturity]}`}>{MATURITY_LABELS[maturity]}</span>} />}

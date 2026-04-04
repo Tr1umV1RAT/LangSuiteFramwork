@@ -11,6 +11,7 @@ $ErrorActionPreference = 'Stop'
 
 $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $ClientDir = Join-Path $ProjectRoot 'client'
+$VenvDir = Join-Path $ProjectRoot '.venv'
 
 function Write-Step {
     param([string]$Message, [string]$Color = 'Cyan')
@@ -30,8 +31,23 @@ function Initialize-LogFile {
     return $resolvedPath
 }
 
+function Get-ProtectedAncestorProcessIds {
+    $protected = @{}
+    $current = [uint32]$PID
+    while ($current -and -not $protected.ContainsKey($current)) {
+        $protected[$current] = $true
+        $proc = Get-CimInstance Win32_Process -Filter "ProcessId = $current" -ErrorAction SilentlyContinue
+        if (-not $proc -or -not $proc.ParentProcessId -or $proc.ParentProcessId -eq 0) {
+            break
+        }
+        $current = [uint32]$proc.ParentProcessId
+    }
+    return $protected
+}
+
 function Stop-LangSuiteProcess {
     param([string]$RootPath)
+    $protected = Get-ProtectedAncestorProcessIds
     $escaped = [Regex]::Escape($RootPath)
     $candidates = Get-CimInstance Win32_Process | Where-Object {
         ($_.CommandLine -match $escaped) -and (
@@ -41,16 +57,17 @@ function Stop-LangSuiteProcess {
             $_.CommandLine -match 'npm run preview'
         )
     }
-    foreach ($proc in $candidates) {
+    foreach ($procId in (Expand-DescendantProcessIds -RootIds ($candidates | Where-Object { -not $protected.ContainsKey([uint32]$_.ProcessId) } | ForEach-Object { [uint32]$_.ProcessId }) | Sort-Object -Descending)) {
+        if ($protected.ContainsKey([uint32]$procId)) { continue }
         try {
             if ($DryRun) {
-                Write-Step "[dry-run] Would stop process $($proc.ProcessId)" 'Yellow'
+                Write-Step "[dry-run] Would stop process $procId" 'Yellow'
             } else {
-                Stop-Process -Id $proc.ProcessId -Force -ErrorAction Stop
-                Write-Step "Stopped process $($proc.ProcessId)" 'Yellow'
+                Stop-Process -Id $procId -Force -ErrorAction Stop
+                Write-Step "Stopped process $procId" 'Yellow'
             }
         } catch {
-            Write-Warning "Failed to stop process $($proc.ProcessId): $_"
+            Write-Warning "Failed to stop process $procId: $_"
         }
     }
 }
@@ -78,6 +95,7 @@ Remove-IfExists (Join-Path $ClientDir 'tsconfig.tsbuildinfo')
 Remove-IfExists (Join-Path $ProjectRoot '.pytest_cache')
 
 Get-ChildItem -Path $ProjectRoot -Recurse -Directory -Filter '__pycache__' -ErrorAction SilentlyContinue |
+    Where-Object { -not $_.FullName.StartsWith($VenvDir, [System.StringComparison]::OrdinalIgnoreCase) } |
     ForEach-Object { Remove-IfExists $_.FullName }
 
 Get-ChildItem -Path (Join-Path $ProjectRoot 'db') -Filter 'langgraph_builder.db*' -ErrorAction SilentlyContinue |

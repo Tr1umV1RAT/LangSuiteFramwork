@@ -11,7 +11,7 @@ import {
   ARTIFACT_KIND_META,
   getAllowedArtifactKindsForMode,
 } from '../../capabilities';
-import { RAIL_BADGE_CLASSES, RAIL_LABELS, SURFACE_BADGE_CLASSES, SURFACE_LABELS } from '../../catalog';
+import { getRailBadgeClass, getRailLabel, SURFACE_BADGE_CLASSES, SURFACE_LABELS } from '../../catalog';
 
 const KIND_META: Record<ArtifactType, { label: string; icon: typeof GitBranch; accent: string; defaultProfile: ExecutionProfile; defaultAsync: boolean }> = {
   graph: { label: ARTIFACT_KIND_META.graph.label, icon: GitBranch, accent: 'text-slate-300 bg-slate-500/10 border-slate-500/20', defaultProfile: ARTIFACT_KIND_META.graph.defaultExecutionProfile, defaultAsync: ARTIFACT_KIND_META.graph.defaultAsync },
@@ -203,7 +203,7 @@ export default function ArtifactLibrarySection() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide border ${meta.accent}`}>{item.kind}</span>
                         <SurfacePill level={surfaceLevel} />
-                        {item.rail && <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide border inline-flex items-center gap-1 ${RAIL_BADGE_CLASSES[item.rail]}`}><Waypoints size={10} />{RAIL_LABELS[item.rail]}</span>}
+                        {item.rail && <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide border inline-flex items-center gap-1 ${getRailBadgeClass(item.rail)}`}><Waypoints size={10} />{getRailLabel(item.rail)}</span>}
                         {item.built_in && <span className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">starter</span>}
                         {typeof item.compileSafe === 'boolean' && <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide border ${item.compileSafe ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20' : 'bg-red-500/10 text-red-300 border-red-500/20'}`}>{item.compileSafe ? 'compile-safe' : 'not compile-safe'}</span>}
                         {typeof item.editorOnly === 'boolean' && <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide border ${item.editorOnly ? 'bg-amber-500/10 text-amber-300 border-amber-500/20' : 'bg-cyan-500/10 text-cyan-300 border-cyan-500/20'}`}>{item.editorOnly ? 'editor-first' : 'runtime-enabled'}</span>}

@@ -62,9 +62,34 @@ if ! command -v python3 >/dev/null 2>&1 && ! command -v python >/dev/null 2>&1; 
   echo "Python 3 was not found. Install Python or ensure python3 is in PATH." >&2
   exit 1
 fi
-if [[ ! -d "$VENV_DIR" ]]; then
-  invoke_external "Creating Python virtual environment in $VENV_DIR" bash -lc "if command -v python3 >/dev/null 2>&1; then python3 -m venv '$VENV_DIR'; else python -m venv '$VENV_DIR'; fi"
-fi
+ensure_virtualenv() {
+  if [[ $DRY_RUN -eq 1 ]]; then
+    if [[ ! -d "$VENV_DIR" ]]; then
+      write_step "[dry-run] Would create Python virtual environment in $VENV_DIR"
+    elif [[ ! -x "$PYTHON_EXE" ]]; then
+      write_step "[dry-run] Would recreate incomplete Python virtual environment in $VENV_DIR"
+    else
+      write_step '[dry-run] Verified Python virtual environment shape.'
+    fi
+    return
+  fi
+  recreate=0
+  if [[ ! -d "$VENV_DIR" ]]; then
+    recreate=1
+  elif [[ ! -x "$PYTHON_EXE" ]]; then
+    write_step "Existing virtual environment is incomplete (missing python executable); recreating $VENV_DIR"
+    rm -rf "$VENV_DIR"
+    recreate=1
+  elif ! "$PYTHON_EXE" -m pip --version >/dev/null 2>&1; then
+    write_step "Existing virtual environment is incomplete (pip unavailable); recreating $VENV_DIR"
+    rm -rf "$VENV_DIR"
+    recreate=1
+  fi
+  if [[ $recreate -eq 1 ]]; then
+    invoke_external "Creating Python virtual environment in $VENV_DIR" bash -lc "if command -v python3 >/dev/null 2>&1; then python3 -m venv '$VENV_DIR'; else python -m venv '$VENV_DIR'; fi"
+  fi
+}
+ensure_virtualenv
 if [[ $DRY_RUN -eq 0 ]]; then require_path "$PYTHON_EXE" 'Virtual environment python'; fi
 invoke_external 'Installing backend dependencies...' "$PYTHON_EXE" -m pip install --upgrade pip
 invoke_external 'Installing backend requirements...' "$PYTHON_EXE" -m pip install -r "$REQUIREMENTS_PATH"
