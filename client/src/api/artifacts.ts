@@ -1,4 +1,5 @@
 import type { ArtifactType, BridgeIntegrationModel, ExecutionProfile, PackagingEligibility, ProjectMode, RailId, SurfaceLevel } from '../capabilities';
+import type { RuntimeSettings } from '../store/types';
 
 export type ArtifactKind = ArtifactType;
 
@@ -92,7 +93,7 @@ export interface ArtifactManifest {
     isAsync?: boolean;
     artifactType?: ArtifactKind;
     executionProfile?: ExecutionProfile;
-    runtimeSettings?: Record<string, unknown> | { recursionLimit: number; streamMode: string; debug: boolean; inheritParentBindings: boolean; storeBackend: string; storePath: string };
+    runtimeSettings?: Partial<RuntimeSettings>;
     projectMode?: ProjectMode;
   };
 }

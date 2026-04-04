@@ -164,6 +164,25 @@ export default function ArtifactLibrarySection() {
           placeholder="Filter the library..."
           className="w-full bg-black/20 border border-panel-border rounded px-2 py-1.5 text-[11px] text-white placeholder:text-slate-600 outline-none focus:border-blue-500"
         />
+        {items.some((item) => item.id === 'jdr_solo_session_starter') && activeProjectMode === 'langgraph' && (
+          <div className="rounded-lg border border-fuchsia-500/20 bg-fuchsia-500/10 px-2.5 py-2 text-[10px] leading-5 text-fuchsia-100">
+            <div>Tabletop demo: <strong>Tabletop Solo Session Starter</strong> opens on the LangGraph surface with GM, cast, packs, dice, and a rules helper.</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                onClick={() => window.dispatchEvent(new CustomEvent('langsuite:open-tabletop-starter'))}
+                className="rounded-md border border-fuchsia-500/25 bg-fuchsia-500/12 px-2 py-1 text-[10px] font-medium text-fuchsia-50 hover:bg-fuchsia-500/18 transition-all"
+              >
+                Guided setup
+              </button>
+              <button
+                onClick={() => void openArtifact('graph', 'jdr_solo_session_starter')}
+                className="rounded-md border border-panel-border bg-black/20 px-2 py-1 text-[10px] text-slate-100 hover:bg-panel-hover transition-all"
+              >
+                Open starter
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="px-3 pb-3 space-y-3 overflow-auto max-h-[340px] scrollbar-thin">
@@ -203,7 +222,7 @@ export default function ArtifactLibrarySection() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide border ${meta.accent}`}>{item.kind}</span>
                         <SurfacePill level={surfaceLevel} />
-                        {item.rail && <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide border inline-flex items-center gap-1 ${getRailBadgeClass(item.rail)}`}><Waypoints size={10} />{getRailLabel(item.rail)}</span>}
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide border inline-flex items-center gap-1 ${getRailBadgeClass(item.rail)}`}><Waypoints size={10} />{getRailLabel(item.rail)}</span>
                         {item.built_in && <span className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">starter</span>}
                         {typeof item.compileSafe === 'boolean' && <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide border ${item.compileSafe ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20' : 'bg-red-500/10 text-red-300 border-red-500/20'}`}>{item.compileSafe ? 'compile-safe' : 'not compile-safe'}</span>}
                         {typeof item.editorOnly === 'boolean' && <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide border ${item.editorOnly ? 'bg-amber-500/10 text-amber-300 border-amber-500/20' : 'bg-cyan-500/10 text-cyan-300 border-cyan-500/20'}`}>{item.editorOnly ? 'editor-first' : 'runtime-enabled'}</span>}

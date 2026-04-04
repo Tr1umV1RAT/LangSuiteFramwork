@@ -15,7 +15,7 @@ import {
   projectModeAllowsCompile,
   projectModeAllowsRuntime,
 } from '../capabilities';
-import type { GraphBinding, ImportDiagnostic, ModuleLibraryCategory, ModuleLibraryEntry, ModuleLibraryLineage, ModulePromptAssignmentPreset, ModuleStarterArtifactRef, PromptAssignmentTarget, PromptStripAssignment, PromptStripDefinition, PromptStripMergeMode, PromptStripVariableDefinition, RuntimeSettings, SerializedWorkspaceTab, SurfaceTruthSummary, Tab, WorkspaceTreeSnapshot, SubagentDefinition, SubagentGroupDefinition } from './types';
+import type { GraphBinding, ImportDiagnostic, ModuleLibraryCategory, ModuleLibraryEntry, ModuleLibraryLineage, ModulePromptAssignmentPreset, ModuleStarterArtifactRef, PromptAssignmentTarget, PromptStripAssignment, PromptStripDefinition, PromptStripMergeMode, PromptStripVariableDefinition, RuntimeSettings, SerializedWorkspaceTab, SurfaceTruthSummary, Tab, WorkspaceTreeSnapshot, SubagentDefinition, SubagentGroupDefinition, SceneSeed, EncounterSeed, LocationSeed, ClockSeed, FactionSeed, HookSeed, HookTarget, FactionPresence, ModuleSlotProvision, RuntimeSlotBinding, ModuleSlotName, ModuleSlotEntityType, ModuleSlotPolicy, ModuleSeedMergePolicy, SubagentRef } from './types';
 
 export { normalizeVisibleArtifactType, normalizeVisibleExecutionProfile, normalizeWorkspaceArtifactType, normalizeWorkspaceExecutionProfile };
 
@@ -147,8 +147,380 @@ function sanitizeRuntimeContextEntries(raw: unknown): { key: string; value: stri
     : [];
 }
 
+const MODULE_SLOT_NAME_RE = /^(opening_scene|default_location|starter_encounter|starter_clock|primary_cast|fallback_referee_frame)$/;
+const MODULE_IDENTIFIER_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+function sanitizeStringList(raw: unknown, pattern?: RegExp): string[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const cleaned: string[] = [];
+  raw.forEach((item) => {
+    const value = typeof item === 'string' ? item.trim() : '';
+    if (!value) return;
+    if (pattern && !pattern.test(value)) return;
+    if (seen.has(value)) return;
+    seen.add(value);
+    cleaned.push(value);
+  });
+  return cleaned;
+}
+
+function sanitizeSeedMergePolicy(raw: unknown): ModuleSeedMergePolicy {
+  return raw === 'preserve' || raw === 'replace' ? raw : 'error';
+}
+
+function sanitizeSeedStatus(raw: unknown): 'seeded' | 'active' | 'resolved' {
+  return raw === 'active' || raw === 'resolved' ? raw : 'seeded';
+}
+
+function sanitizeModuleSlotName(raw: unknown): ModuleSlotName | null {
+  return typeof raw === 'string' && MODULE_SLOT_NAME_RE.test(raw.trim()) ? raw.trim() as ModuleSlotName : null;
+}
+
+function sanitizeModuleSlotEntityType(raw: unknown): ModuleSlotEntityType | null {
+  const value = typeof raw === 'string' ? raw.trim() : '';
+  return value === 'scene' || value === 'encounter' || value === 'location' || value === 'clock' || value === 'cast_group' || value === 'faction' ? value : null;
+}
+
+function sanitizeModuleSlotPolicy(raw: unknown): ModuleSlotPolicy {
+  return raw === 'append' || raw === 'replace' ? raw : 'exclusive';
+}
+
+function sanitizeSubagentRef(raw: unknown): SubagentRef | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const data = raw as Record<string, unknown>;
+  const groupName = typeof data.groupName === 'string' ? data.groupName.trim() : '';
+  const agentName = typeof data.agentName === 'string' ? data.agentName.trim() : '';
+  if (!MODULE_IDENTIFIER_RE.test(groupName) || !MODULE_IDENTIFIER_RE.test(agentName)) return null;
+  return { groupName, agentName };
+}
+
+function sanitizeStructuredSeedBase<T extends {
+  id: string;
+  title: string;
+  description?: string;
+  tags?: string[];
+  mergePolicy?: ModuleSeedMergePolicy;
+  origin?: 'workspace' | 'artifact';
+  artifactRef?: string | null;
+  sourceModuleId?: string;
+}>(
+  data: Record<string, unknown>,
+  fallbackId: string,
+  fallbackTitle: string,
+) {
+  const id = typeof data.id === 'string' && MODULE_IDENTIFIER_RE.test(data.id.trim()) ? data.id.trim() : fallbackId;
+  const title = typeof data.title === 'string' && data.title.trim() ? data.title.trim() : fallbackTitle;
+  const sourceModuleId = typeof data.sourceModuleId === 'string' && MODULE_IDENTIFIER_RE.test(data.sourceModuleId.trim())
+    ? data.sourceModuleId.trim()
+    : undefined;
+  return {
+    id,
+    title,
+    description: typeof data.description === 'string' ? data.description : '',
+    tags: sanitizeStringList(data.tags),
+    mergePolicy: sanitizeSeedMergePolicy(data.mergePolicy),
+    origin: data.origin === 'artifact' ? 'artifact' as const : 'workspace' as const,
+    artifactRef: typeof data.artifactRef === 'string' && data.artifactRef.trim() ? data.artifactRef.trim() : null,
+    sourceModuleId,
+  };
+}
+
+function sanitizeSceneSeed(raw: unknown, index: number): SceneSeed | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const data = raw as Record<string, unknown>;
+  const base = sanitizeStructuredSeedBase(data, `scene_${index + 1}`, `Scene ${index + 1}`);
+  const kind = data.kind === 'travel' || data.kind === 'social' || data.kind === 'investigation' || data.kind === 'combat' || data.kind === 'fallback' ? data.kind : 'opening';
+  const locationId = typeof data.locationId === 'string' && MODULE_IDENTIFIER_RE.test(data.locationId.trim()) ? data.locationId.trim() : undefined;
+  return {
+    ...base,
+    kind,
+    status: sanitizeSeedStatus(data.status),
+    locationId,
+    objective: typeof data.objective === 'string' ? data.objective : '',
+    situation: typeof data.situation === 'string' ? data.situation : '',
+    castGroupNames: sanitizeStringList(data.castGroupNames, MODULE_IDENTIFIER_RE),
+    encounterIds: sanitizeStringList(data.encounterIds, MODULE_IDENTIFIER_RE),
+    clockIds: sanitizeStringList(data.clockIds, MODULE_IDENTIFIER_RE),
+  };
+}
+
+function sanitizeEncounterSeed(raw: unknown, index: number): EncounterSeed | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const data = raw as Record<string, unknown>;
+  const base = sanitizeStructuredSeedBase(data, `encounter_${index + 1}`, `Encounter ${index + 1}`);
+  const kind = data.kind === 'combat_pressure' || data.kind === 'hazard' || data.kind === 'investigation' || data.kind === 'pursuit' ? data.kind : 'social_pressure';
+  const sceneId = typeof data.sceneId === 'string' && MODULE_IDENTIFIER_RE.test(data.sceneId.trim()) ? data.sceneId.trim() : undefined;
+  const locationId = typeof data.locationId === 'string' && MODULE_IDENTIFIER_RE.test(data.locationId.trim()) ? data.locationId.trim() : undefined;
+  const participantRefs = Array.isArray(data.participantRefs)
+    ? data.participantRefs.map((item) => sanitizeSubagentRef(item)).filter((item): item is SubagentRef => Boolean(item))
+    : [];
+  return {
+    ...base,
+    kind,
+    status: sanitizeSeedStatus(data.status),
+    sceneId,
+    locationId,
+    participantRefs,
+    pressure: data.pressure === 'low' || data.pressure === 'high' ? data.pressure : 'medium',
+    stakes: typeof data.stakes === 'string' ? data.stakes : '',
+    successAtCost: typeof data.successAtCost === 'string' ? data.successAtCost : '',
+    falloutOnFail: typeof data.falloutOnFail === 'string' ? data.falloutOnFail : '',
+    suggestedToolIds: sanitizeStringList(data.suggestedToolIds, MODULE_IDENTIFIER_RE),
+  };
+}
+
+function sanitizeLocationSeed(raw: unknown, index: number): LocationSeed | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const data = raw as Record<string, unknown>;
+  const base = sanitizeStructuredSeedBase(data, `location_${index + 1}`, `Location ${index + 1}`);
+  const kind = data.kind === 'inn' || data.kind === 'district' || data.kind === 'station' || data.kind === 'ruin' || data.kind === 'wilderness' || data.kind === 'settlement' ? data.kind : 'site';
+  const parentLocationId = typeof data.parentLocationId === 'string' && MODULE_IDENTIFIER_RE.test(data.parentLocationId.trim()) ? data.parentLocationId.trim() : undefined;
+  return {
+    ...base,
+    kind,
+    status: sanitizeSeedStatus(data.status),
+    summary: typeof data.summary === 'string' ? data.summary : '',
+    region: typeof data.region === 'string' ? data.region : '',
+    parentLocationId,
+    sceneIds: sanitizeStringList(data.sceneIds, MODULE_IDENTIFIER_RE),
+  };
+}
+
+function sanitizeClockSeed(raw: unknown, index: number): ClockSeed | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const data = raw as Record<string, unknown>;
+  const base = sanitizeStructuredSeedBase(data, `clock_${index + 1}`, `Clock ${index + 1}`);
+  const sceneId = typeof data.sceneId === 'string' && MODULE_IDENTIFIER_RE.test(data.sceneId.trim()) ? data.sceneId.trim() : undefined;
+  const locationId = typeof data.locationId === 'string' && MODULE_IDENTIFIER_RE.test(data.locationId.trim()) ? data.locationId.trim() : undefined;
+  const segments = Number.isFinite(Number(data.segments)) ? Math.max(1, Math.min(24, Number(data.segments))) : 4;
+  const progress = Number.isFinite(Number(data.progress)) ? Math.max(0, Math.min(segments, Number(data.progress))) : 0;
+  return {
+    ...base,
+    status: sanitizeSeedStatus(data.status),
+    segments,
+    progress,
+    trigger: typeof data.trigger === 'string' ? data.trigger : '',
+    consequence: typeof data.consequence === 'string' ? data.consequence : '',
+    sceneId,
+    locationId,
+    factionIds: sanitizeStringList(data.factionIds, MODULE_IDENTIFIER_RE),
+    linkedSceneIds: sanitizeStringList(data.linkedSceneIds, MODULE_IDENTIFIER_RE),
+    linkedEncounterIds: sanitizeStringList(data.linkedEncounterIds, MODULE_IDENTIFIER_RE),
+    publicVisible: data.publicVisible === true,
+  };
+}
+
+function sanitizeFactionPresence(raw: unknown): FactionPresence | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const data = raw as Record<string, unknown>;
+  const locationId = typeof data.locationId === 'string' && MODULE_IDENTIFIER_RE.test(data.locationId.trim()) ? data.locationId.trim() : '';
+  if (!locationId) return null;
+  const strength = data.strength === 'weak' || data.strength === 'present' || data.strength === 'strong' || data.strength === 'dominant' ? data.strength : 'hidden';
+  return {
+    locationId,
+    strength,
+    details: typeof data.details === 'string' ? data.details : '',
+  };
+}
+
+function sanitizeFactionSeed(raw: unknown, index: number): FactionSeed | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const data = raw as Record<string, unknown>;
+  const base = sanitizeStructuredSeedBase(data, `faction_${index + 1}`, `Faction ${index + 1}`);
+  const tier = data.tier === 'regional' || data.tier === 'global' || data.tier === 'planar' || data.tier === 'cosmic' ? data.tier : 'local';
+  const factionType = typeof data.factionType === 'string' ? data.factionType : 'political';
+  const allowedFactionTypes = new Set(['political', 'criminal', 'economic', 'mystical', 'military', 'guild', 'mercantile', 'religious', 'nomadic', 'hermetic']);
+  const presence = Array.isArray(data.presence)
+    ? data.presence.map((item) => sanitizeFactionPresence(item)).filter((item): item is FactionPresence => Boolean(item))
+    : [];
+  return {
+    ...base,
+    tier,
+    factionType: allowedFactionTypes.has(factionType) ? factionType as FactionSeed['factionType'] : 'political',
+    presence,
+    agenda: typeof data.agenda === 'string' ? data.agenda : '',
+    resources: sanitizeStringList(data.resources),
+    rivalIds: sanitizeStringList(data.rivalIds, MODULE_IDENTIFIER_RE),
+    allyIds: sanitizeStringList(data.allyIds, MODULE_IDENTIFIER_RE),
+    clockIds: sanitizeStringList(data.clockIds, MODULE_IDENTIFIER_RE),
+    sceneIds: sanitizeStringList(data.sceneIds, MODULE_IDENTIFIER_RE),
+    leaderName: typeof data.leaderName === 'string' && data.leaderName.trim() ? data.leaderName.trim() : undefined,
+    headquartersLocationId: typeof data.headquartersLocationId === 'string' && MODULE_IDENTIFIER_RE.test(data.headquartersLocationId.trim()) ? data.headquartersLocationId.trim() : undefined,
+  };
+}
+
+function sanitizeHookTarget(raw: unknown): HookTarget | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const data = raw as Record<string, unknown>;
+  const targetType = data.targetType;
+  const allowed = new Set(['scene', 'location', 'encounter', 'faction', 'npc', 'any']);
+  const targetId = typeof data.targetId === 'string' && MODULE_IDENTIFIER_RE.test(data.targetId.trim()) ? data.targetId.trim() : '';
+  if (!allowed.has(String(targetType || '')) || !targetId) return null;
+  const weight = Number.isFinite(Number(data.weight)) ? Math.max(0, Math.min(10, Number(data.weight))) : 1;
+  return { targetType: targetType as HookTarget['targetType'], targetId, weight };
+}
+
+function sanitizeHookSeed(raw: unknown, index: number): HookSeed | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const data = raw as Record<string, unknown>;
+  const base = sanitizeStructuredSeedBase(data, `hook_${index + 1}`, `Hook ${index + 1}`);
+  const allowed = new Set(['rumor', 'event', 'discovery', 'threat', 'opportunity', 'mystery', 'task', 'vision']);
+  const hookKind = typeof data.hookKind === 'string' && allowed.has(data.hookKind) ? data.hookKind as HookSeed['hookKind'] : 'rumor';
+  const targets = Array.isArray(data.targets)
+    ? data.targets.map((item) => sanitizeHookTarget(item)).filter((item): item is HookTarget => Boolean(item))
+    : [];
+  return {
+    ...base,
+    hookKind,
+    triggerCondition: typeof data.triggerCondition === 'string' ? data.triggerCondition : 'always',
+    content: typeof data.content === 'string' ? data.content : '',
+    targets,
+    expirationClockId: typeof data.expirationClockId === 'string' && MODULE_IDENTIFIER_RE.test(data.expirationClockId.trim()) ? data.expirationClockId.trim() : undefined,
+    expirationCondition: typeof data.expirationCondition === 'string' ? data.expirationCondition : '',
+    used: data.used === true,
+    hidden: data.hidden !== false,
+    gmNotes: typeof data.gmNotes === 'string' ? data.gmNotes : '',
+    suggestedChecks: sanitizeStringList(data.suggestedChecks),
+  };
+}
+
+function sanitizeFactionSeeds(raw: unknown): FactionSeed[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const items: FactionSeed[] = [];
+  raw.forEach((item, index) => {
+    const sanitized = sanitizeFactionSeed(item, index);
+    if (!sanitized || seen.has(sanitized.id)) return;
+    seen.add(sanitized.id);
+    items.push(sanitized);
+  });
+  return items;
+}
+
+function sanitizeHookSeeds(raw: unknown): HookSeed[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const items: HookSeed[] = [];
+  raw.forEach((item, index) => {
+    const sanitized = sanitizeHookSeed(item, index);
+    if (!sanitized || seen.has(sanitized.id)) return;
+    seen.add(sanitized.id);
+    items.push(sanitized);
+  });
+  return items;
+}
+
+function sanitizeModuleSlotProvision(raw: unknown): ModuleSlotProvision | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const data = raw as Record<string, unknown>;
+  const slot = sanitizeModuleSlotName(data.slot);
+  const entityType = sanitizeModuleSlotEntityType(data.entityType);
+  const entityId = typeof data.entityId === 'string' && MODULE_IDENTIFIER_RE.test(data.entityId.trim()) ? data.entityId.trim() : '';
+  if (!slot || !entityType || !entityId) return null;
+  return {
+    slot,
+    entityType,
+    entityId,
+    policy: sanitizeModuleSlotPolicy(data.policy),
+  };
+}
+
+function sanitizeRuntimeSlotBinding(raw: unknown): RuntimeSlotBinding | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const data = raw as Record<string, unknown>;
+  const slot = sanitizeModuleSlotName(data.slot);
+  const entityType = sanitizeModuleSlotEntityType(data.entityType);
+  const entityId = typeof data.entityId === 'string' && MODULE_IDENTIFIER_RE.test(data.entityId.trim()) ? data.entityId.trim() : '';
+  const providerModuleId = typeof data.providerModuleId === 'string' && MODULE_IDENTIFIER_RE.test(data.providerModuleId.trim()) ? data.providerModuleId.trim() : '';
+  if (!slot || !entityType || !entityId || !providerModuleId) return null;
+  return { slot, entityType, entityId, providerModuleId };
+}
+
+function sanitizeSceneSeeds(raw: unknown): SceneSeed[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const items: SceneSeed[] = [];
+  raw.forEach((item, index) => {
+    const sanitized = sanitizeSceneSeed(item, index);
+    if (!sanitized || seen.has(sanitized.id)) return;
+    seen.add(sanitized.id);
+    items.push(sanitized);
+  });
+  return items;
+}
+
+function sanitizeEncounterSeeds(raw: unknown): EncounterSeed[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const items: EncounterSeed[] = [];
+  raw.forEach((item, index) => {
+    const sanitized = sanitizeEncounterSeed(item, index);
+    if (!sanitized || seen.has(sanitized.id)) return;
+    seen.add(sanitized.id);
+    items.push(sanitized);
+  });
+  return items;
+}
+
+function sanitizeLocationSeeds(raw: unknown): LocationSeed[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const items: LocationSeed[] = [];
+  raw.forEach((item, index) => {
+    const sanitized = sanitizeLocationSeed(item, index);
+    if (!sanitized || seen.has(sanitized.id)) return;
+    seen.add(sanitized.id);
+    items.push(sanitized);
+  });
+  return items;
+}
+
+function sanitizeClockSeeds(raw: unknown): ClockSeed[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const items: ClockSeed[] = [];
+  raw.forEach((item, index) => {
+    const sanitized = sanitizeClockSeed(item, index);
+    if (!sanitized || seen.has(sanitized.id)) return;
+    seen.add(sanitized.id);
+    items.push(sanitized);
+  });
+  return items;
+}
+
+function sanitizeModuleSlotProvisions(raw: unknown): ModuleSlotProvision[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const items: ModuleSlotProvision[] = [];
+  raw.forEach((item) => {
+    const sanitized = sanitizeModuleSlotProvision(item);
+    if (!sanitized) return;
+    const key = `${sanitized.slot}:${sanitized.entityType}:${sanitized.entityId}:${sanitized.policy}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    items.push(sanitized);
+  });
+  return items;
+}
+
+function sanitizeRuntimeSlotBindings(raw: unknown): RuntimeSlotBinding[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const items: RuntimeSlotBinding[] = [];
+  raw.forEach((item) => {
+    const sanitized = sanitizeRuntimeSlotBinding(item);
+    if (!sanitized) return;
+    const key = `${sanitized.slot}:${sanitized.entityType}:${sanitized.entityId}:${sanitized.providerModuleId}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    items.push(sanitized);
+  });
+  return items;
+}
+
 function sanitizeModuleCategory(raw: unknown): ModuleLibraryCategory {
-  return raw === 'world' || raw === 'rules' || raw === 'persona' || raw === 'party' || raw === 'utility' ? raw : 'mixed';
+  return raw === 'world' || raw === 'rules' || raw === 'persona' || raw === 'party' || raw === 'utility' || raw === 'adventure' ? raw : 'mixed';
 }
 
 function sanitizeModuleLineage(raw: unknown): ModuleLibraryLineage {
@@ -251,6 +623,16 @@ function sanitizeModuleLibraryEntry(raw: unknown, index: number): ModuleLibraryE
     subagentGroups: sanitizeSubagentLibrary(data.subagentGroups),
     starterArtifacts: sanitizeModuleStarterArtifactRefs(data.starterArtifacts),
     runtimeContext: sanitizeRuntimeContextEntries(data.runtimeContext),
+    moduleDependencies: sanitizeIdentifierList(data.moduleDependencies),
+    moduleConflicts: sanitizeIdentifierList(data.moduleConflicts),
+    requiresSlots: sanitizeStringList(data.requiresSlots, MODULE_SLOT_NAME_RE) as ModuleSlotName[],
+    providesSlots: sanitizeModuleSlotProvisions(data.providesSlots),
+    sceneSeeds: sanitizeSceneSeeds(data.sceneSeeds),
+    encounterSeeds: sanitizeEncounterSeeds(data.encounterSeeds),
+    locationSeeds: sanitizeLocationSeeds(data.locationSeeds),
+    clockSeeds: sanitizeClockSeeds(data.clockSeeds),
+    factionSeeds: sanitizeFactionSeeds(data.factionSeeds),
+    hookSeeds: sanitizeHookSeeds(data.hookSeeds),
   };
 }
 
@@ -303,6 +685,16 @@ function sanitizePromptAssignmentTarget(raw: unknown, fallbackTabId = 'active_ta
   return null;
 }
 
+function sanitizePromptAssignmentIdentifier(raw: unknown, fallback: string): string {
+  const source = typeof raw === 'string' && raw.trim() ? raw.trim() : fallback;
+  const normalized = source
+    .replace(/[^A-Za-z0-9_]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  if (!normalized) return fallback;
+  return /^[A-Za-z_]/.test(normalized) ? normalized : `prompt_${normalized}`;
+}
+
 function sanitizePromptStripAssignment(raw: unknown, index: number, fallbackTabId = 'active_tab'): PromptStripAssignment | null {
   if (!raw || typeof raw !== 'object') return null;
   const data = raw as Record<string, unknown>;
@@ -311,7 +703,7 @@ function sanitizePromptStripAssignment(raw: unknown, index: number, fallbackTabI
   if (!target || !stripId) return null;
   const mergeMode: PromptStripMergeMode = data.mergeMode === 'append' || data.mergeMode === 'replace_if_empty' ? data.mergeMode : 'prepend';
   return {
-    id: typeof data.id === 'string' && data.id.trim() ? data.id.trim() : `prompt_assignment_${index + 1}`,
+    id: sanitizePromptAssignmentIdentifier(data.id, `prompt_assignment_${index + 1}`),
     stripId,
     target,
     mergeMode,
@@ -327,9 +719,14 @@ function sanitizePromptStripAssignments(raw: unknown, fallbackTabId = 'active_ta
   raw.forEach((item, index) => {
     const sanitized = sanitizePromptStripAssignment(item, index, fallbackTabId);
     if (!sanitized) return;
-    if (seen.has(sanitized.id)) return;
-    seen.add(sanitized.id);
-    assignments.push(sanitized);
+    let candidateId = sanitized.id;
+    let suffix = 2;
+    while (seen.has(candidateId)) {
+      candidateId = `${sanitized.id}_${suffix}`;
+      suffix += 1;
+    }
+    seen.add(candidateId);
+    assignments.push({ ...sanitized, id: candidateId });
   });
   return assignments;
 }
@@ -338,6 +735,12 @@ export function buildPromptAssignmentTargetKey(target: PromptAssignmentTarget): 
   if (target.kind === 'graph') return `graph:${target.tabId}`;
   if (target.kind === 'node') return `node:${target.tabId}:${target.nodeId}`;
   return `subagent:${target.tabId}:${target.groupName}:${target.agentName}`;
+}
+
+function buildPromptAssignmentTargetIdPart(target: PromptAssignmentTarget): string {
+  if (target.kind === 'graph') return `graph_${target.tabId}`;
+  if (target.kind === 'node') return `node_${target.tabId}_${target.nodeId}`;
+  return `subagent_${target.tabId}_${target.groupName}_${target.agentName}`;
 }
 
 export function describePromptAssignmentTarget(target: PromptAssignmentTarget): string {
@@ -352,6 +755,13 @@ export function matchesPromptAssignmentTarget(left: PromptAssignmentTarget, righ
 
 export function getPromptAssignmentsForTarget(assignments: PromptStripAssignment[], target: PromptAssignmentTarget): PromptStripAssignment[] {
   return assignments.filter((assignment) => matchesPromptAssignmentTarget(assignment.target, target));
+}
+
+export function remapPromptAssignmentsToTabId(assignments: PromptStripAssignment[], tabId: string): PromptStripAssignment[] {
+  return sanitizePromptStripAssignments(assignments.map((assignment) => ({
+    ...assignment,
+    target: { ...assignment.target, tabId } as PromptAssignmentTarget,
+  })), tabId);
 }
 
 function getPromptStripBodies(assignments: PromptStripAssignment[], library: PromptStripDefinition[], mergeMode: PromptStripMergeMode): string[] {
@@ -473,6 +883,13 @@ export function defaultRuntimeSettings(projectMode: ProjectMode = 'langgraph'): 
     loadedModuleIds: [],
     runtimeContext: [],
     shellExecutionEnabled: false,
+    sceneSeeds: [],
+    encounterSeeds: [],
+    locationSeeds: [],
+    clockSeeds: [],
+    factionSeeds: [],
+    hookSeeds: [],
+    slotBindings: [],
   };
 }
 
@@ -495,6 +912,13 @@ export function sanitizeRuntimeSettings(settings: Partial<RuntimeSettings> | nul
     loadedModuleIds: sanitizeLoadedModuleIds(settings?.loadedModuleIds),
     runtimeContext: sanitizeRuntimeContextEntries(settings?.runtimeContext),
     shellExecutionEnabled: settings?.shellExecutionEnabled === true,
+    sceneSeeds: sanitizeSceneSeeds(settings?.sceneSeeds),
+    encounterSeeds: sanitizeEncounterSeeds(settings?.encounterSeeds),
+    locationSeeds: sanitizeLocationSeeds(settings?.locationSeeds),
+    clockSeeds: sanitizeClockSeeds(settings?.clockSeeds),
+    factionSeeds: sanitizeFactionSeeds(settings?.factionSeeds),
+    hookSeeds: sanitizeHookSeeds(settings?.hookSeeds),
+    slotBindings: sanitizeRuntimeSlotBindings(settings?.slotBindings),
   };
 }
 
@@ -525,6 +949,105 @@ function mergeSubagentLibraries(base: SubagentGroupDefinition[], incoming: Subag
 function mergeRuntimeContextLists(base: { key: string; value: string }[], incoming: { key: string; value: string }[]): { key: string; value: string }[] {
   const seen = new Set(base.map((entry) => entry.key));
   return [...base, ...incoming.filter((entry) => !seen.has(entry.key))];
+}
+
+function getLoadedModuleEntries(settings: RuntimeSettings): ModuleLibraryEntry[] {
+  const ids = new Set(settings.loadedModuleIds || []);
+  return (settings.moduleLibrary || []).filter((entry) => ids.has(entry.id));
+}
+
+function assertModuleCanBeApplied(settings: RuntimeSettings, moduleEntry: ModuleLibraryEntry): void {
+  const loadedIds = new Set(settings.loadedModuleIds || []);
+  (moduleEntry.moduleDependencies || []).forEach((dependencyId) => {
+    if (!loadedIds.has(dependencyId)) {
+      throw new Error(`Module '${moduleEntry.id}' requires missing module '${dependencyId}'.`);
+    }
+  });
+  (moduleEntry.moduleConflicts || []).forEach((conflictId) => {
+    if (loadedIds.has(conflictId)) {
+      throw new Error(`Module '${moduleEntry.id}' conflicts with already loaded module '${conflictId}'.`);
+    }
+  });
+  getLoadedModuleEntries(settings).forEach((loadedModule) => {
+    if ((loadedModule.moduleConflicts || []).includes(moduleEntry.id)) {
+      throw new Error(`Loaded module '${loadedModule.id}' conflicts with module '${moduleEntry.id}'.`);
+    }
+  });
+}
+
+function attachSourceModuleId<T extends { sourceModuleId?: string }>(items: T[], moduleId: string): T[] {
+  return items.map((item) => ({ ...item, sourceModuleId: item.sourceModuleId || moduleId }));
+}
+
+function mergeSeedListsById<T extends { id: string; mergePolicy?: ModuleSeedMergePolicy }>(
+  base: T[],
+  incoming: T[],
+  label: string,
+  moduleId: string,
+): T[] {
+  const byId = new Map(base.map((item) => [item.id, item]));
+  incoming.forEach((item) => {
+    const existing = byId.get(item.id);
+    if (!existing) {
+      byId.set(item.id, item);
+      return;
+    }
+    if (JSON.stringify(existing) === JSON.stringify(item)) return;
+    const mergePolicy = item.mergePolicy || 'error';
+    if (mergePolicy === 'preserve') return;
+    if (mergePolicy === 'replace') {
+      byId.set(item.id, item);
+      return;
+    }
+    throw new Error(`Module '${moduleId}' attempted to redefine ${label} '${item.id}'.`);
+  });
+  return Array.from(byId.values());
+}
+
+function mergeSlotBindings(
+  base: RuntimeSlotBinding[],
+  incoming: ModuleSlotProvision[],
+  providerModuleId: string,
+): RuntimeSlotBinding[] {
+  let next = [...base];
+  incoming.forEach((provision) => {
+    const binding: RuntimeSlotBinding = {
+      slot: provision.slot,
+      entityType: provision.entityType,
+      entityId: provision.entityId,
+      providerModuleId,
+    };
+    if (provision.policy === 'replace') {
+      next = next.filter((existing) => existing.slot !== provision.slot);
+      next.push(binding);
+      return;
+    }
+    if (provision.policy === 'append') {
+      const duplicate = next.some((existing) => existing.slot === binding.slot && existing.entityType === binding.entityType && existing.entityId === binding.entityId && existing.providerModuleId === providerModuleId);
+      if (!duplicate) next.push(binding);
+      return;
+    }
+    const conflict = next.find((existing) => existing.slot === provision.slot && existing.providerModuleId !== providerModuleId);
+    if (conflict) {
+      throw new Error(`Module '${providerModuleId}' cannot claim exclusive slot '${provision.slot}' because it is already provided by '${conflict.providerModuleId}'.`);
+    }
+    next = next.filter((existing) => !(existing.slot === binding.slot && existing.providerModuleId === providerModuleId));
+    next.push(binding);
+  });
+  return next;
+}
+
+function assertRequiredSlotsResolved(
+  slotBindings: RuntimeSlotBinding[],
+  requiredSlots: ModuleSlotName[],
+  moduleId: string,
+): void {
+  const available = new Set(slotBindings.map((binding) => binding.slot));
+  requiredSlots.forEach((slot) => {
+    if (!available.has(slot)) {
+      throw new Error(`Module '${moduleId}' requires unresolved slot '${slot}'.`);
+    }
+  });
 }
 
 function buildModulePresetRuntimeTarget(preset: ModulePromptAssignmentPreset, tabId: string): PromptAssignmentTarget | null {
@@ -587,7 +1110,10 @@ function mergePromptAssignmentsFromModule(base: PromptStripAssignment[], moduleE
     const nextOrderBase = (maxOrderByTarget.get(targetKey) ?? -1) + 1;
     const order = Math.min(999, Math.max(nextOrderBase, preset.order));
     next.push({
-      id: `${moduleEntry.id}__${preset.id || `preset_${index + 1}`}__${targetKey}`.replace(/[^a-zA-Z0-9_:\-]/g, '_'),
+      id: sanitizePromptAssignmentIdentifier(
+        `${moduleEntry.id}__${preset.id || `preset_${index + 1}`}__${buildPromptAssignmentTargetIdPart(target)}`,
+        `prompt_assignment_${next.length + 1}`,
+      ),
       stripId: preset.stripId,
       target,
       mergeMode: preset.mergeMode,
@@ -601,15 +1127,40 @@ function mergePromptAssignmentsFromModule(base: PromptStripAssignment[], moduleE
 }
 
 export function applyModuleDefinitionToRuntimeSettings(settings: RuntimeSettings, moduleEntry: ModuleLibraryEntry, options: { tabId?: string | null } = {}): RuntimeSettings {
+  assertModuleCanBeApplied(settings, moduleEntry);
+
+  const incomingSceneSeeds = attachSourceModuleId(moduleEntry.sceneSeeds || [], moduleEntry.id);
+  const incomingEncounterSeeds = attachSourceModuleId(moduleEntry.encounterSeeds || [], moduleEntry.id);
+  const incomingLocationSeeds = attachSourceModuleId(moduleEntry.locationSeeds || [], moduleEntry.id);
+  const incomingClockSeeds = attachSourceModuleId(moduleEntry.clockSeeds || [], moduleEntry.id);
+  const incomingFactionSeeds = attachSourceModuleId(moduleEntry.factionSeeds || [], moduleEntry.id);
+  const incomingHookSeeds = attachSourceModuleId(moduleEntry.hookSeeds || [], moduleEntry.id);
+
+  const nextSlotBindings = mergeSlotBindings(
+    settings.slotBindings || [],
+    moduleEntry.providesSlots || [],
+    moduleEntry.id,
+  );
+
+  assertRequiredSlotsResolved(nextSlotBindings, moduleEntry.requiresSlots || [], moduleEntry.id);
+
   return sanitizeRuntimeSettings({
     ...settings,
     promptStripLibrary: mergePromptStripLibraries(settings.promptStripLibrary || [], moduleEntry.promptStrips || []),
     promptStripAssignments: mergePromptAssignmentsFromModule(settings.promptStripAssignments || [], moduleEntry, options.tabId),
     subagentLibrary: mergeSubagentLibraries(settings.subagentLibrary || [], moduleEntry.subagentGroups || []),
     runtimeContext: mergeRuntimeContextLists(settings.runtimeContext || [], moduleEntry.runtimeContext || []),
+    sceneSeeds: mergeSeedListsById(settings.sceneSeeds || [], incomingSceneSeeds, 'sceneSeeds', moduleEntry.id),
+    encounterSeeds: mergeSeedListsById(settings.encounterSeeds || [], incomingEncounterSeeds, 'encounterSeeds', moduleEntry.id),
+    locationSeeds: mergeSeedListsById(settings.locationSeeds || [], incomingLocationSeeds, 'locationSeeds', moduleEntry.id),
+    clockSeeds: mergeSeedListsById(settings.clockSeeds || [], incomingClockSeeds, 'clockSeeds', moduleEntry.id),
+    factionSeeds: mergeSeedListsById(settings.factionSeeds || [], incomingFactionSeeds, 'factionSeeds', moduleEntry.id),
+    hookSeeds: mergeSeedListsById(settings.hookSeeds || [], incomingHookSeeds, 'hookSeeds', moduleEntry.id),
+    slotBindings: nextSlotBindings,
     loadedModuleIds: Array.from(new Set([...(settings.loadedModuleIds || []), moduleEntry.id])),
   });
 }
+
 
 export function buildModuleLibraryEntryFromRuntimeSettings(settings: RuntimeSettings, seed: Partial<ModuleLibraryEntry> = {}, options: { tabId?: string | null } = {}): ModuleLibraryEntry {
   return {
@@ -630,6 +1181,16 @@ export function buildModuleLibraryEntryFromRuntimeSettings(settings: RuntimeSett
     subagentGroups: sanitizeSubagentLibrary(Array.isArray(seed.subagentGroups) ? seed.subagentGroups : settings.subagentLibrary),
     starterArtifacts: sanitizeModuleStarterArtifactRefs(Array.isArray(seed.starterArtifacts) ? seed.starterArtifacts : []),
     runtimeContext: sanitizeRuntimeContextEntries(Array.isArray(seed.runtimeContext) ? seed.runtimeContext : settings.runtimeContext),
+    moduleDependencies: sanitizeIdentifierList(Array.isArray(seed.moduleDependencies) ? seed.moduleDependencies : []),
+    moduleConflicts: sanitizeIdentifierList(Array.isArray(seed.moduleConflicts) ? seed.moduleConflicts : []),
+    requiresSlots: sanitizeStringList(Array.isArray(seed.requiresSlots) ? seed.requiresSlots : [], MODULE_SLOT_NAME_RE) as ModuleSlotName[],
+    providesSlots: sanitizeModuleSlotProvisions(Array.isArray(seed.providesSlots) ? seed.providesSlots : []),
+    sceneSeeds: sanitizeSceneSeeds(Array.isArray(seed.sceneSeeds) ? seed.sceneSeeds : []),
+    encounterSeeds: sanitizeEncounterSeeds(Array.isArray(seed.encounterSeeds) ? seed.encounterSeeds : []),
+    locationSeeds: sanitizeLocationSeeds(Array.isArray(seed.locationSeeds) ? seed.locationSeeds : []),
+    clockSeeds: sanitizeClockSeeds(Array.isArray(seed.clockSeeds) ? seed.clockSeeds : []),
+    factionSeeds: sanitizeFactionSeeds(Array.isArray(seed.factionSeeds) ? seed.factionSeeds : []),
+    hookSeeds: sanitizeHookSeeds(Array.isArray(seed.hookSeeds) ? seed.hookSeeds : []),
   };
 }
 

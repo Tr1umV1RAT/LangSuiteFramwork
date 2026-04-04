@@ -11,7 +11,6 @@ $ErrorActionPreference = 'Stop'
 
 $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $ClientDir = Join-Path $ProjectRoot 'client'
-$VenvDir = Join-Path $ProjectRoot '.venv'
 
 function Write-Step {
     param([string]$Message, [string]$Color = 'Cyan')
@@ -31,42 +30,133 @@ function Initialize-LogFile {
     return $resolvedPath
 }
 
-function Get-ProtectedAncestorProcessIds {
-    $protected = @{}
-    $current = [uint32]$PID
-    while ($current -and -not $protected.ContainsKey($current)) {
-        $protected[$current] = $true
-        $proc = Get-CimInstance Win32_Process -Filter "ProcessId = $current" -ErrorAction SilentlyContinue
-        if (-not $proc -or -not $proc.ParentProcessId -or $proc.ParentProcessId -eq 0) {
-            break
+function Get-ProcessPropertyValue {
+    param([object]$Proc, [string[]]$Names)
+    foreach ($name in $Names) {
+        $prop = $Proc.PSObject.Properties[$name]
+        if ($null -ne $prop) {
+            $value = $prop.Value
+            if ($null -ne $value -and "$value".Trim() -ne '') {
+                return $value
+            }
         }
-        $current = [uint32]$proc.ParentProcessId
+    }
+    return $null
+}
+
+function Get-ProcessIdValue {
+    param([object]$Proc)
+    $value = Get-ProcessPropertyValue -Proc $Proc -Names @('ProcessId', 'Id', 'Handle')
+    if ($null -eq $value) { return $null }
+    try { return [int]$value } catch { return $null }
+}
+
+function Get-ParentProcessIdValue {
+    param([object]$Proc)
+    $value = Get-ProcessPropertyValue -Proc $Proc -Names @('ParentProcessId', 'ParentProcessID')
+    if ($null -eq $value) { return 0 }
+    try { return [int]$value } catch { return 0 }
+}
+
+function Get-CommandLineValue {
+    param([object]$Proc)
+    $value = Get-ProcessPropertyValue -Proc $Proc -Names @('CommandLine')
+    if ($null -eq $value) { return '' }
+    return [string]$value
+}
+
+function Get-NormalizedProcessSnapshot {
+    $normalized = @()
+    foreach ($proc in @(Get-CimInstance Win32_Process)) {
+        $procId = Get-ProcessIdValue -Proc $proc
+        if ($null -eq $procId) {
+            continue
+        }
+        $normalized += [pscustomobject]@{
+            ProcessId = $procId
+            ParentProcessId = Get-ParentProcessIdValue -Proc $proc
+            CommandLine = Get-CommandLineValue -Proc $proc
+            Name = [string](Get-ProcessPropertyValue -Proc $proc -Names @('Name'))
+        }
+    }
+    return @($normalized)
+}
+
+function Get-ProtectedProcessIds {
+    $protected = New-Object 'System.Collections.Generic.HashSet[int]'
+    $cursor = Get-CimInstance Win32_Process -Filter "ProcessId = $PID" -ErrorAction SilentlyContinue
+    while ($null -ne $cursor) {
+        $cursorId = Get-ProcessIdValue -Proc $cursor
+        if ($null -eq $cursorId) { break }
+        $null = $protected.Add($cursorId)
+        $parentId = Get-ParentProcessIdValue -Proc $cursor
+        if ($parentId -le 0 -or $parentId -eq $cursorId) { break }
+        $cursor = Get-CimInstance Win32_Process -Filter "ProcessId = $parentId" -ErrorAction SilentlyContinue
     }
     return $protected
 }
 
+function Get-LangSuiteProcessStopOrder {
+    param([string]$RootPath)
+    $escaped = [Regex]::Escape($RootPath)
+    $all = @(Get-NormalizedProcessSnapshot)
+    $protected = Get-ProtectedProcessIds
+    $childrenByParent = @{}
+    foreach ($proc in $all) {
+        $parentId = [int]$proc.ParentProcessId
+        if (-not $childrenByParent.ContainsKey($parentId)) {
+            $childrenByParent[$parentId] = @()
+        }
+        $childrenByParent[$parentId] += ,$proc
+    }
+    $matched = @(
+        $all | Where-Object {
+            $_.CommandLine -and
+            $_.CommandLine -match $escaped -and (
+                $_.CommandLine -match 'uvicorn' -or
+                $_.CommandLine -match 'vite' -or
+                $_.CommandLine -match 'node(.exe)? .*vite' -or
+                $_.CommandLine -match 'npm(.cmd)? run dev' -or
+                $_.CommandLine -match 'npm(.cmd)? run preview'
+            ) -and
+            -not $protected.Contains([int]$_.ProcessId)
+        }
+    )
+    $seen = New-Object 'System.Collections.Generic.HashSet[int]'
+    $ordered = New-Object System.Collections.ArrayList
+    function Add-Tree {
+        param([object]$Proc)
+        $procId = Get-ProcessIdValue -Proc $Proc
+        if ($null -eq $procId) { return }
+        if ($protected.Contains($procId) -or $seen.Contains($procId)) { return }
+        $null = $seen.Add($procId)
+        foreach ($child in @($childrenByParent[$procId])) {
+            Add-Tree -Proc $child
+        }
+        [void]$ordered.Add($Proc)
+    }
+    foreach ($proc in $matched) {
+        Add-Tree -Proc $proc
+    }
+    return @($ordered)
+}
+
 function Stop-LangSuiteProcess {
     param([string]$RootPath)
-    $protected = Get-ProtectedAncestorProcessIds
-    $escaped = [Regex]::Escape($RootPath)
-    $candidates = Get-CimInstance Win32_Process | Where-Object {
-        ($_.CommandLine -match $escaped) -and (
-            $_.CommandLine -match 'uvicorn' -or
-            $_.CommandLine -match 'vite' -or
-            $_.CommandLine -match 'npm run dev' -or
-            $_.CommandLine -match 'npm run preview'
-        )
-    }
-    foreach ($procId in (Expand-DescendantProcessIds -RootIds ($candidates | Where-Object { -not $protected.ContainsKey([uint32]$_.ProcessId) } | ForEach-Object { [uint32]$_.ProcessId }) | Sort-Object -Descending)) {
-        if ($protected.ContainsKey([uint32]$procId)) { continue }
+    $ordered = @(Get-LangSuiteProcessStopOrder -RootPath $RootPath)
+    foreach ($proc in $ordered) {
         try {
             if ($DryRun) {
-                Write-Step "[dry-run] Would stop process $procId" 'Yellow'
+                $procId = Get-ProcessIdValue -Proc $proc
+                Write-Step "[dry-run] Would stop descendant-tree process $procId" 'Yellow'
             } else {
+                $procId = Get-ProcessIdValue -Proc $proc
+                if ($null -eq $procId) { continue }
                 Stop-Process -Id $procId -Force -ErrorAction Stop
-                Write-Step "Stopped process $procId" 'Yellow'
+                Write-Step "Stopped descendant-tree process $procId" 'Yellow'
             }
         } catch {
+            $procId = Get-ProcessIdValue -Proc $proc
             Write-Warning "Failed to stop process $procId: $_"
         }
     }
@@ -95,7 +185,7 @@ Remove-IfExists (Join-Path $ClientDir 'tsconfig.tsbuildinfo')
 Remove-IfExists (Join-Path $ProjectRoot '.pytest_cache')
 
 Get-ChildItem -Path $ProjectRoot -Recurse -Directory -Filter '__pycache__' -ErrorAction SilentlyContinue |
-    Where-Object { -not $_.FullName.StartsWith($VenvDir, [System.StringComparison]::OrdinalIgnoreCase) } |
+    Where-Object { $_.FullName -notlike (Join-Path $ProjectRoot '.venv*') } |
     ForEach-Object { Remove-IfExists $_.FullName }
 
 Get-ChildItem -Path (Join-Path $ProjectRoot 'db') -Filter 'langgraph_builder.db*' -ErrorAction SilentlyContinue |

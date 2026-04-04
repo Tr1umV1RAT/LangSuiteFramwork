@@ -2,7 +2,6 @@
 set -euo pipefail
 PROJECT_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 CLIENT_DIR="$PROJECT_ROOT/client"
-VENV_DIR="$PROJECT_ROOT/.venv"
 DRY_RUN=0
 REMOVE_NODE_MODULES=0
 CLEAN_NPM_CACHE=0
@@ -20,7 +19,7 @@ remove_if_exists "$CLIENT_DIR/dist"
 remove_if_exists "$PROJECT_ROOT/static"
 remove_if_exists "$CLIENT_DIR/tsconfig.tsbuildinfo"
 remove_if_exists "$PROJECT_ROOT/.pytest_cache"
-find "$PROJECT_ROOT" -path "$VENV_DIR" -prune -o -type d -name '__pycache__' -print0 2>/dev/null | while IFS= read -r -d '' d; do remove_if_exists "$d"; done
+find "$PROJECT_ROOT" -path "$PROJECT_ROOT/.venv" -prune -o -type d -name '__pycache__' -print0 2>/dev/null | while IFS= read -r -d '' d; do remove_if_exists "$d"; done
 if [[ -d "$PROJECT_ROOT/db" ]]; then find "$PROJECT_ROOT/db" -maxdepth 1 -name 'langgraph_builder.db*' -print0 2>/dev/null | while IFS= read -r -d '' f; do remove_if_exists "$f"; done; fi
 if [[ -d "$PROJECT_ROOT/data" ]]; then find "$PROJECT_ROOT/data" -maxdepth 1 -name '*.db*' -print0 2>/dev/null | while IFS= read -r -d '' f; do remove_if_exists "$f"; done; fi
 if [[ $REMOVE_NODE_MODULES -eq 1 ]]; then remove_if_exists "$CLIENT_DIR/node_modules"; fi

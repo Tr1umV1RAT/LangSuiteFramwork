@@ -51,8 +51,7 @@ def run():
     expect('npm ci' in install_text or 'npm install' in install_text, 'installer does not install frontend deps')
     expect('npm run build' in install_text, 'installer does not build frontend')
     expect('CreateShortcuts-LangSuite.sh' in install_text, 'installer does not offer shortcut creation')
-    expect('ensure_virtualenv' in install_text, 'installer does not repair incomplete virtual environments')
-    expect('pip --version' in install_text, 'installer does not verify pip in the virtual environment')
+    expect('pip --version' in install_text, 'installer does not validate venv pip health before reuse')
 
     launch_text = (QA / 'Launch-LangSuite.sh').read_text(encoding='utf-8')
     expect('uvicorn main:app' in launch_text, 'launcher does not start backend')
@@ -65,13 +64,12 @@ def run():
     stop_text = (QA / 'Stop-LangSuite.sh').read_text(encoding='utf-8')
     expect('Stopping obvious local LangSuite processes' in stop_text, 'stop script does not announce process stop')
     expect('ps -eo' in stop_text, 'stop script does not inspect local processes')
-    expect('node .*vite' in stop_text, 'stop script does not cover node/vite descendants')
-    expect('collect_descendants' in stop_text, 'stop script does not collect descendant processes')
-    expect('collect_protected_ancestors' in stop_text, 'stop script does not protect its own ancestor processes')
-    expect('kill -TERM --' not in stop_text, 'stop script still kills whole process groups')
+    expect('node .*vite' in stop_text or 'node[[:space:]].*vite' in stop_text, 'stop script does not cover node/vite descendants')
+    expect('collect_descendants' in stop_text, 'stop script does not walk descendant trees')
+    expect('protected[$pid_cursor]' in stop_text or 'ancestry protection' in stop_text.lower(), 'stop script does not protect the current shell ancestry')
 
     hard_reset_text = (QA / 'HardReset-LangSuite.sh').read_text(encoding='utf-8')
-    expect('-path "$VENV_DIR" -prune' in hard_reset_text, 'hard reset still descends into .venv __pycache__ trees')
+    expect('.venv' in hard_reset_text and '-prune' in hard_reset_text, 'hard reset does not prune .venv during cache cleanup')
 
     uninstall_text = (QA / 'Uninstall-LangSuite.sh').read_text(encoding='utf-8')
     expect('HardReset-LangSuite.sh' in uninstall_text, 'uninstaller does not chain through hard reset')

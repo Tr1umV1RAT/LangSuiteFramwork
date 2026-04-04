@@ -131,17 +131,21 @@ export const RAIL_BADGE_CLASSES: Record<RailId, string> = {
   adapter: 'text-amber-300 bg-amber-500/10 border-amber-500/20',
   services: 'text-slate-300 bg-slate-500/10 border-slate-500/20',
 };
+const FALLBACK_RAIL_ID: RailId = 'trunk';
 
 export function normalizeRailId(value: unknown): RailId {
-  return typeof value === 'string' && value in RAIL_LABELS ? (value as RailId) : 'trunk';
+  if (typeof value === 'string' && Object.prototype.hasOwnProperty.call(RAIL_META, value)) {
+    return value as RailId;
+  }
+  return FALLBACK_RAIL_ID;
 }
 
 export function getRailLabel(value: unknown): string {
-  return RAIL_LABELS[normalizeRailId(value)] || RAIL_LABELS.trunk;
+  return RAIL_LABELS[normalizeRailId(value)];
 }
 
 export function getRailBadgeClass(value: unknown): string {
-  return RAIL_BADGE_CLASSES[normalizeRailId(value)] || RAIL_BADGE_CLASSES.trunk;
+  return RAIL_BADGE_CLASSES[normalizeRailId(value)];
 }
 
 export const KIND_ORDER: BuilderArtifactKind[] = ['primitive', 'composite', 'suite', 'reference'];

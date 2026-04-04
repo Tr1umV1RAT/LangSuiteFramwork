@@ -6,7 +6,7 @@ export type UiDensity = 'compact' | 'standard' | 'comfortable';
 export type RunPanelTab = 'inputs' | 'execution' | 'json';
 export type PaletteMode = 'quickstart' | 'common' | 'all';
 export type PalettePreset = 'minimal' | 'graph' | 'memory_rag' | 'advanced' | 'debug';
-export type WorkspacePreset = 'graph_simple' | 'graph_memory' | 'debug_build' | 'advanced_authoring';
+export type WorkspacePreset = 'graph_simple' | 'graph_memory' | 'debug_build' | 'advanced_authoring' | 'tabletop_demo';
 export type ValidationSeverity = 'error' | 'warning' | 'info';
 
 export interface Preferences {
@@ -80,8 +80,16 @@ export interface PromptStripAssignment {
   enabled: boolean;
 }
 
-export type ModuleLibraryCategory = 'world' | 'rules' | 'persona' | 'party' | 'utility' | 'mixed';
+export type ModuleLibraryCategory = 'world' | 'rules' | 'persona' | 'party' | 'utility' | 'adventure' | 'mixed';
 export type ModuleLibraryLineage = 'shared' | 'branch_overlay';
+export type ModuleSeedMergePolicy = 'error' | 'preserve' | 'replace';
+export type SceneSeedKind = 'opening' | 'travel' | 'social' | 'investigation' | 'combat' | 'fallback';
+export type EncounterSeedKind = 'social_pressure' | 'combat_pressure' | 'hazard' | 'investigation' | 'pursuit';
+export type LocationSeedKind = 'inn' | 'district' | 'station' | 'ruin' | 'wilderness' | 'settlement' | 'site';
+export type SeedStatus = 'seeded' | 'active' | 'resolved';
+export type ModuleSlotName = 'opening_scene' | 'default_location' | 'starter_encounter' | 'starter_clock' | 'primary_cast' | 'fallback_referee_frame';
+export type ModuleSlotEntityType = 'scene' | 'encounter' | 'location' | 'clock' | 'cast_group' | 'faction';
+export type ModuleSlotPolicy = 'exclusive' | 'append' | 'replace';
 
 export interface ModulePromptAssignmentPreset {
   id: string;
@@ -99,6 +107,122 @@ export interface ModuleStarterArtifactRef {
   artifactKind: string;
   label?: string;
   description?: string;
+}
+
+export interface SubagentRef {
+  groupName: string;
+  agentName: string;
+}
+
+export interface StructuredSeedBase {
+  id: string;
+  title: string;
+  description?: string;
+  tags: string[];
+  mergePolicy: ModuleSeedMergePolicy;
+  origin: 'workspace' | 'artifact';
+  artifactRef?: string | null;
+  sourceModuleId?: string;
+}
+
+export interface SceneSeed extends StructuredSeedBase {
+  kind: SceneSeedKind;
+  status: SeedStatus;
+  locationId?: string;
+  objective?: string;
+  situation?: string;
+  castGroupNames: string[];
+  encounterIds: string[];
+  clockIds: string[];
+}
+
+export interface EncounterSeed extends StructuredSeedBase {
+  kind: EncounterSeedKind;
+  status: SeedStatus;
+  sceneId?: string;
+  locationId?: string;
+  participantRefs: SubagentRef[];
+  pressure: 'low' | 'medium' | 'high';
+  stakes?: string;
+  successAtCost?: string;
+  falloutOnFail?: string;
+  suggestedToolIds: string[];
+}
+
+export interface LocationSeed extends StructuredSeedBase {
+  kind: LocationSeedKind;
+  status: SeedStatus;
+  summary?: string;
+  region?: string;
+  parentLocationId?: string;
+  sceneIds: string[];
+}
+
+export interface ClockSeed extends StructuredSeedBase {
+  status: SeedStatus;
+  segments: number;
+  progress: number;
+  trigger?: string;
+  consequence?: string;
+  sceneId?: string;
+  locationId?: string;
+  factionIds: string[];
+  linkedSceneIds: string[];
+  linkedEncounterIds: string[];
+  publicVisible: boolean;
+}
+
+export interface FactionPresence {
+  locationId: string;
+  strength: 'hidden' | 'weak' | 'present' | 'strong' | 'dominant';
+  details?: string;
+}
+
+export interface FactionSeed extends StructuredSeedBase {
+  tier: 'local' | 'regional' | 'global' | 'planar' | 'cosmic';
+  factionType: 'political' | 'criminal' | 'economic' | 'mystical' | 'military' | 'guild' | 'mercantile' | 'religious' | 'nomadic' | 'hermetic';
+  presence: FactionPresence[];
+  agenda?: string;
+  resources: string[];
+  rivalIds: string[];
+  allyIds: string[];
+  clockIds: string[];
+  sceneIds: string[];
+  leaderName?: string;
+  headquartersLocationId?: string;
+}
+
+export interface HookTarget {
+  targetType: 'scene' | 'location' | 'encounter' | 'faction' | 'npc' | 'any';
+  targetId: string;
+  weight: number;
+}
+
+export interface HookSeed extends StructuredSeedBase {
+  hookKind: 'rumor' | 'event' | 'discovery' | 'threat' | 'opportunity' | 'mystery' | 'task' | 'vision';
+  triggerCondition: string;
+  content?: string;
+  targets: HookTarget[];
+  expirationClockId?: string;
+  expirationCondition?: string;
+  used: boolean;
+  hidden: boolean;
+  gmNotes?: string;
+  suggestedChecks: string[];
+}
+
+export interface ModuleSlotProvision {
+  slot: ModuleSlotName;
+  entityType: ModuleSlotEntityType;
+  entityId: string;
+  policy: ModuleSlotPolicy;
+}
+
+export interface RuntimeSlotBinding {
+  slot: ModuleSlotName;
+  entityType: ModuleSlotEntityType;
+  entityId: string;
+  providerModuleId: string;
 }
 
 export interface ModuleLibraryEntry {
@@ -119,6 +243,16 @@ export interface ModuleLibraryEntry {
   subagentGroups: SubagentGroupDefinition[];
   starterArtifacts: ModuleStarterArtifactRef[];
   runtimeContext: { key: string; value: string }[];
+  moduleDependencies: string[];
+  moduleConflicts: string[];
+  requiresSlots: ModuleSlotName[];
+  providesSlots: ModuleSlotProvision[];
+  sceneSeeds: SceneSeed[];
+  encounterSeeds: EncounterSeed[];
+  locationSeeds: LocationSeed[];
+  clockSeeds: ClockSeed[];
+  factionSeeds: FactionSeed[];
+  hookSeeds: HookSeed[];
 }
 
 export interface RuntimeSettings {
@@ -136,6 +270,13 @@ export interface RuntimeSettings {
   loadedModuleIds: string[];
   runtimeContext: { key: string; value: string }[];
   shellExecutionEnabled: boolean;
+  sceneSeeds: SceneSeed[];
+  encounterSeeds: EncounterSeed[];
+  locationSeeds: LocationSeed[];
+  clockSeeds: ClockSeed[];
+  factionSeeds: FactionSeed[];
+  hookSeeds: HookSeed[];
+  slotBindings: RuntimeSlotBinding[];
 }
 
 export interface GraphValidationIssue {

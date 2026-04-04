@@ -1,0 +1,2643 @@
+{
+  "id": "jdr_solo_session_starter",
+  "kind": "graph",
+  "title": "Tabletop Solo Session Starter",
+  "description": "LangGraph tabletop starter with GM, one player, NPC cast, prompt packs, and dice.",
+  "built_in": true,
+  "artifact": {
+    "name": "Tabletop Solo Session Starter",
+    "nodes": [
+      {
+        "id": "user_input_node_1",
+        "type": "custom",
+        "position": {
+          "x": 40,
+          "y": 170
+        },
+        "data": {
+          "nodeType": "user_input_node",
+          "label": "Player Input",
+          "params": {
+            "prompt": "Describe what your character does.",
+            "output_key": "messages"
+          }
+        }
+      },
+      {
+        "id": "gm_llm_1",
+        "type": "custom",
+        "position": {
+          "x": 340,
+          "y": 160
+        },
+        "data": {
+          "nodeType": "llm_chat",
+          "label": "GM",
+          "params": {
+            "temperature": 0.6,
+            "system_prompt": "",
+            "tools_linked": [
+              "tool_rpg_dice_roller_1",
+              "tool_sub_agent_cast_1",
+              "tool_sub_agent_cast_2",
+              "tool_sub_agent_cast_3",
+              "tool_llm_worker_rules_referee_1"
+            ]
+          }
+        }
+      },
+      {
+        "id": "chat_output_1",
+        "type": "custom",
+        "position": {
+          "x": 670,
+          "y": 170
+        },
+        "data": {
+          "nodeType": "chat_output",
+          "label": "Session Output",
+          "params": {
+            "input_key": "messages"
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e_player_to_gm",
+        "source": "user_input_node_1",
+        "target": "gm_llm_1",
+        "animated": true
+      },
+      {
+        "id": "e_gm_to_output",
+        "source": "gm_llm_1",
+        "target": "chat_output_1",
+        "animated": true
+      }
+    ],
+    "tools": [
+      {
+        "id": "tool_rpg_dice_roller_1",
+        "type": "rpg_dice_roller",
+        "description": "Roll standard tabletop notation such as 1d20, 2d6+1, or 4dF.",
+        "ui_meta": {
+          "nodeType": "tool_rpg_dice_roller",
+          "position": {
+            "x": 120,
+            "y": 360
+          },
+          "label": "RPG Dice Roller"
+        }
+      },
+      {
+        "id": "tool_sub_agent_cast_1",
+        "type": "sub_agent_tool",
+        "description": "Cast advisor for gossip, hospitality, rumors, and local social leverage.",
+        "params": {
+          "target_group": "roadside_cast",
+          "target_agent": "innkeeper",
+          "max_invocations": 2,
+          "allow_repeat": "true",
+          "temperature": 0.4
+        },
+        "ui_meta": {
+          "nodeType": "tool_sub_agent",
+          "position": {
+            "x": 330,
+            "y": 360
+          },
+          "label": "Cast Advisor · Innkeeper"
+        }
+      },
+      {
+        "id": "tool_sub_agent_cast_2",
+        "type": "sub_agent_tool",
+        "description": "Cast advisor for tracks, travel hazards, route judgment, and fieldcraft.",
+        "params": {
+          "target_group": "roadside_cast",
+          "target_agent": "scout",
+          "max_invocations": 2,
+          "allow_repeat": "true",
+          "temperature": 0.4
+        },
+        "ui_meta": {
+          "nodeType": "tool_sub_agent",
+          "position": {
+            "x": 510,
+            "y": 360
+          },
+          "label": "Cast Advisor · Scout"
+        }
+      },
+      {
+        "id": "tool_sub_agent_cast_3",
+        "type": "sub_agent_tool",
+        "description": "Cast advisor for security posture, suspicion, hard pressure, and deterrence.",
+        "params": {
+          "target_group": "roadside_cast",
+          "target_agent": "guard",
+          "max_invocations": 2,
+          "allow_repeat": "true",
+          "temperature": 0.4
+        },
+        "ui_meta": {
+          "nodeType": "tool_sub_agent",
+          "position": {
+            "x": 690,
+            "y": 360
+          },
+          "label": "Cast Advisor · Guard"
+        }
+      },
+      {
+        "id": "tool_llm_worker_rules_referee_1",
+        "type": "tool_llm_worker",
+        "description": "Structured rules advisor for checks, difficulty, modifiers, consequences, and next-state guidance.",
+        "params": {
+          "system_prompt": "You are a structured tabletop rules referee. Return concise adjudication with: intent, likely check, difficulty, modifiers, consequence, and next state. Do not narrate for the GM; support the GM with bounded rulings.",
+          "temperature": 0.1,
+          "execution_group": "main"
+        },
+        "ui_meta": {
+          "nodeType": "tool_llm_worker",
+          "position": {
+            "x": 870,
+            "y": 360
+          },
+          "label": "Structured Rules Referee"
+        }
+      }
+    ],
+    "customStateSchema": [],
+    "graphBindings": [],
+    "isAsync": true,
+    "artifactType": "graph",
+    "executionProfile": "langgraph_async",
+    "projectMode": "langgraph",
+    "runtimeSettings": {
+      "recursionLimit": 60,
+      "streamMode": "updates",
+      "debug": false,
+      "inheritParentBindings": true,
+      "subagentLibrary": [
+        {
+          "name": "roadside_cast",
+          "agents": [
+            {
+              "name": "innkeeper",
+              "systemPrompt": "",
+              "tools": [],
+              "description": "Warm host, rumor broker, protective of the inn and its regulars."
+            },
+            {
+              "name": "scout",
+              "systemPrompt": "",
+              "tools": [],
+              "description": "Alert traveler, track reader, practical about danger and weather."
+            },
+            {
+              "name": "guard",
+              "systemPrompt": "",
+              "tools": [],
+              "description": "Suspicious town guard, watches for trouble, respects strength and order."
+            }
+          ]
+        }
+      ],
+      "promptStripLibrary": [
+        {
+          "id": "strip_world_frontier_fantasy",
+          "name": "Frontier fantasy frame",
+          "description": "Grounded low-fantasy frontier assumptions.",
+          "body": "The world is a frontier fantasy setting: small communities, muddy roads, local politics, scarce magic, and consequences that carry forward from scene to scene.",
+          "tags": [
+            "world",
+            "fantasy",
+            "frontier"
+          ],
+          "variables": [],
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter"
+        },
+        {
+          "id": "strip_rules_light_narrative",
+          "name": "Light narrative rules stance",
+          "description": "Keeps resolution light while honoring uncertainty.",
+          "body": "Run a light narrative tabletop loop. Ask for rolls when outcomes are uncertain, stakes are meaningful, or risk is materially different depending on success or failure. Keep rulings clear and bounded.",
+          "tags": [
+            "rules",
+            "light",
+            "narrative"
+          ],
+          "variables": [],
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter"
+        },
+        {
+          "id": "strip_gm_fair_conduct",
+          "name": "Fair GM conduct",
+          "description": "A truthful GM stance.",
+          "body": "Act as a fair game master. Present the world clearly, ask concise clarifying follow-up only when needed for action resolution, keep consequences proportional, and never pretend a roll or fact exists when it has not been established.",
+          "tags": [
+            "gm",
+            "conduct",
+            "fairness"
+          ],
+          "variables": [],
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter"
+        },
+        {
+          "id": "strip_tone_adventure_with_consequence",
+          "name": "Adventure with consequence",
+          "description": "Tone layer for the opening session.",
+          "body": "Maintain an adventurous tone grounded by consequence. Let wonder, danger, and social tension coexist without becoming grimdark parody.",
+          "tags": [
+            "tone",
+            "adventure"
+          ],
+          "variables": [],
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter"
+        },
+        {
+          "id": "strip_npc_innkeeper_persona",
+          "name": "Innkeeper persona",
+          "description": "Innkeeper speaking style and priorities.",
+          "body": "Speak as an innkeeper who is warm at first contact, discreetly observant, willing to trade rumors for trust, and reluctant to endanger the establishment.",
+          "tags": [
+            "npc",
+            "innkeeper"
+          ],
+          "variables": [],
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter"
+        },
+        {
+          "id": "strip_npc_scout_persona",
+          "name": "Scout persona",
+          "description": "Scout speaking style and priorities.",
+          "body": "Speak as a practical scout who notices terrain, timing, tracks, and risk first. Be concise, field-tested, and cautious without becoming fearful.",
+          "tags": [
+            "npc",
+            "scout"
+          ],
+          "variables": [],
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter"
+        },
+        {
+          "id": "strip_npc_guard_persona",
+          "name": "Guard persona",
+          "description": "Guard speaking style and priorities.",
+          "body": "Speak as a town guard who values order, procedure, and visible control. Be suspicious of strangers, but responsive to clear respect and lawful intent.",
+          "tags": [
+            "npc",
+            "guard"
+          ],
+          "variables": [],
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter"
+        },
+        {
+          "id": "strip_tone_mystery_pressure",
+          "name": "Mystery under pressure tone",
+          "description": "Bias scenes toward clues, suspicion, and mounting pressure.",
+          "body": "Run scenes as tense investigation. Surface clues gradually, keep uncertainty legible, and make every answer create a new question, risk, or obligation.",
+          "tags": [
+            "tone",
+            "mystery",
+            "pressure"
+          ],
+          "variables": [],
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter"
+        },
+        {
+          "id": "strip_tone_grim_consequences",
+          "name": "Grim consequences tone",
+          "description": "Bias scenes toward cost, scarcity, and difficult tradeoffs.",
+          "body": "Keep the tone grim, resource-aware, and consequence-heavy. Present hard choices, visible attrition, and persistent aftermath. Avoid melodrama; make pressure concrete.",
+          "tags": [
+            "tone",
+            "grim",
+            "consequence"
+          ],
+          "variables": [],
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter"
+        },
+        {
+          "id": "strip_world_occult_city",
+          "name": "Occult city setting",
+          "description": "Frame the session as an occult-noir city campaign.",
+          "body": "You are running an occult city setting: layered districts, secret societies, compromised institutions, public normalcy over hidden ritual danger, and clues embedded in social scenes.",
+          "tags": [
+            "world",
+            "occult",
+            "city"
+          ],
+          "variables": [],
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter"
+        },
+        {
+          "id": "strip_world_space_outpost",
+          "name": "Space outpost setting",
+          "description": "Frame the session as a pressure-cooker station campaign.",
+          "body": "You are running a remote space outpost setting: fragile infrastructure, rationed resources, layered chains of command, environmental hazards, and mystery framed through logistics and survival.",
+          "tags": [
+            "world",
+            "space",
+            "outpost"
+          ],
+          "variables": [],
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter"
+        },
+        {
+          "id": "strip_rules_dice_forward",
+          "name": "Dice-forward rules stance",
+          "description": "Prefer explicit checks, risk statements, and consequence ladders.",
+          "body": "Run a dice-forward tabletop loop. When intent is risky or uncertain, state the likely check, the difficulty, the stakes, and what changes on success, partial success, or failure before proceeding.",
+          "tags": [
+            "rules",
+            "dice",
+            "resolution"
+          ],
+          "variables": [],
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter"
+        },
+        {
+          "id": "strip_npc_fixer_persona",
+          "name": "Speak as the fixer",
+          "description": "Streetwise broker of access, rumors, and debts.",
+          "body": "Speak as a discreet fixer. Trade access, rumors, and favors with precise prices and implied risks. Keep speech concise, wary, and transactional.",
+          "tags": [
+            "npc",
+            "fixer"
+          ],
+          "variables": [],
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter"
+        },
+        {
+          "id": "strip_npc_librarian_persona",
+          "name": "Speak as the librarian",
+          "description": "Custodian of records, patterns, and hidden references.",
+          "body": "Speak as an erudite occult librarian. Prioritize references, fragments, patterns, and caveats. Offer insight with hesitation when the material is dangerous.",
+          "tags": [
+            "npc",
+            "librarian"
+          ],
+          "variables": [],
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter"
+        },
+        {
+          "id": "strip_npc_inspector_persona",
+          "name": "Speak as the inspector",
+          "description": "Methodical investigator balancing truth and institutional pressure.",
+          "body": "Speak as a pressured inspector. Focus on procedures, contradictions, timelines, and institutional constraints. Let duty and suspicion shape the voice.",
+          "tags": [
+            "npc",
+            "inspector"
+          ],
+          "variables": [],
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter"
+        },
+        {
+          "id": "strip_npc_quartermaster_persona",
+          "name": "Speak as the quartermaster",
+          "description": "Inventory-first survivor who thinks in shortages and leverage.",
+          "body": "Speak as the quartermaster. Think in shortages, substitutions, quotas, and leverage. Make every answer concrete and operational.",
+          "tags": [
+            "npc",
+            "quartermaster"
+          ],
+          "variables": [],
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter"
+        },
+        {
+          "id": "strip_npc_pilot_persona",
+          "name": "Speak as the pilot",
+          "description": "Fast, competent, and always aware of route and risk.",
+          "body": "Speak as the pilot. Focus on vectors, timing, hazards, and what a competent crew can still salvage when plans fail.",
+          "tags": [
+            "npc",
+            "pilot"
+          ],
+          "variables": [],
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter"
+        },
+        {
+          "id": "strip_npc_security_chief_persona",
+          "name": "Speak as the security chief",
+          "description": "Protective, suspicious, and alert to human failure under stress.",
+          "body": "Speak as the security chief. Weigh threats, procedure, morale, and containment. Assume that pressure makes people dangerous.",
+          "tags": [
+            "npc",
+            "security"
+          ],
+          "variables": [],
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter"
+        },
+        {
+          "id": "strip_world_ruined_coast",
+          "name": "Ruined coast setting",
+          "description": "Storm-worn littoral frontier shaped by wreckage and half-drowned ruins.",
+          "body": "You are running a ruined coast setting: salt-scoured strongholds, wreck towns, dangerous tides, lighthouse politics, and old ruins surfacing whenever storms tear the shoreline open.",
+          "tags": [
+            "world",
+            "ruined",
+            "coast"
+          ],
+          "variables": [],
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter"
+        },
+        {
+          "id": "strip_world_corporate_arcology",
+          "name": "Corporate arcology setting",
+          "description": "Layered corporate habitat with service corridors, surveillance, and buried unrest.",
+          "body": "You are running a corporate arcology setting: stacked districts, badge-gated services, private security, outsourced maintenance, and hidden resistance networks moving through vents, service spines, and underlevels.",
+          "tags": [
+            "world",
+            "corporate",
+            "arcology"
+          ],
+          "variables": [],
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter"
+        },
+        {
+          "id": "strip_rules_fiction_first_pressure",
+          "name": "Fiction-first pressure rules stance",
+          "description": "Escalate pressure from fiction before reaching for explicit mechanics.",
+          "body": "Run a fiction-first pressure loop. Let position, leverage, and consequences emerge from the fiction before naming a roll. Ask for explicit checks only when uncertainty survives the fiction and the stakes materially matter.",
+          "tags": [
+            "rules",
+            "fiction",
+            "first",
+            "pressure"
+          ],
+          "variables": [],
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter"
+        },
+        {
+          "id": "strip_rules_hard_choice_clocks",
+          "name": "Hard-choice clocks rules stance",
+          "description": "Track pressure openly and turn progress into visible tradeoffs.",
+          "body": "Run a hard-choice clock loop. Track danger, progress, and response openly. When players push forward, advance clocks, create visible costs, and force tradeoffs instead of flattening outcomes into simple pass/fail.",
+          "tags": [
+            "rules",
+            "clocks",
+            "hard_choice"
+          ],
+          "variables": [],
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter"
+        },
+        {
+          "id": "strip_tone_hopeful_resistance",
+          "name": "Hopeful resistance tone",
+          "description": "Keep pressure real while leaving room for solidarity and earned momentum.",
+          "body": "Maintain a tone of hopeful resistance. Pressure should be real, but victories should create solidarity, local trust, and visible openings against stronger systems.",
+          "tags": [
+            "tone",
+            "hopeful",
+            "resistance"
+          ],
+          "variables": [],
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter"
+        },
+        {
+          "id": "strip_tone_paranoid_intrigue",
+          "name": "Paranoid intrigue tone",
+          "description": "Bias scenes toward double meanings, surveillance, and compromised loyalties.",
+          "body": "Maintain a paranoid intrigue tone. Let information feel expensive, loyalties unstable, and every alliance vulnerable to pressure, blackmail, or divided priorities.",
+          "tags": [
+            "tone",
+            "paranoid",
+            "intrigue"
+          ],
+          "variables": [],
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter"
+        },
+        {
+          "id": "strip_npc_broker_persona",
+          "name": "Speak as the broker",
+          "description": "Deal-maker who prices everything in opportunity, favors, and exposure.",
+          "body": "Speak as the broker. Measure people by leverage, timing, and what can be exchanged without showing your full hand.",
+          "tags": [
+            "npc",
+            "broker"
+          ],
+          "variables": [],
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter"
+        },
+        {
+          "id": "strip_npc_outrider_persona",
+          "name": "Speak as the outrider",
+          "description": "Fast-moving pathfinder who reads risk before others see it.",
+          "body": "Speak as the outrider. Notice routes, chokepoints, weather, and ambush geometry first. Keep your advice practical and mobile.",
+          "tags": [
+            "npc",
+            "outrider"
+          ],
+          "variables": [],
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter"
+        },
+        {
+          "id": "strip_npc_occultist_persona",
+          "name": "Speak as the occultist",
+          "description": "Scholar-practitioner who reads omens, ritual residue, and hidden cost.",
+          "body": "Speak as the occultist. Focus on signs, correspondences, residue, and the price attached to hidden power. Be precise rather than theatrical.",
+          "tags": [
+            "npc",
+            "occultist"
+          ],
+          "variables": [],
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter"
+        },
+        {
+          "id": "strip_npc_medic_persona",
+          "name": "Speak as the medic",
+          "description": "Calm triage-first responder who reads bodies and morale under pressure.",
+          "body": "Speak as the medic. Think in triage, risk of collapse, hidden symptoms, and what keeps people functional for one more scene.",
+          "tags": [
+            "npc",
+            "medic"
+          ],
+          "variables": [],
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter"
+        },
+        {
+          "id": "strip_npc_engineer_persona",
+          "name": "Speak as the engineer",
+          "description": "Systems-minded fixer who sees failure chains and workarounds.",
+          "body": "Speak as the engineer. Read every situation as systems under strain: tolerances, failure points, bypasses, and what can still be salvaged.",
+          "tags": [
+            "npc",
+            "engineer"
+          ],
+          "variables": [],
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter"
+        },
+        {
+          "id": "strip_npc_marshal_persona",
+          "name": "Speak as the marshal",
+          "description": "Field commander balancing order, law, and escalation control.",
+          "body": "Speak as the marshal. Focus on containment, chain of command, lawful pressure, and how quickly disorder can spread when people improvise badly.",
+          "tags": [
+            "npc",
+            "marshal"
+          ],
+          "variables": [],
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter"
+        },
+        {
+          "id": "strip_utility_faction_clock_brief",
+          "name": "Faction pressure brief",
+          "description": "Keep faction responses legible and escalating.",
+          "body": "Track faction pressure in the background. When the table creates noise, leverage, or visible disruption, decide which faction notices, what clock advances, and what new pressure enters the scene.",
+          "tags": [
+            "utility",
+            "faction",
+            "clock"
+          ],
+          "variables": [],
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter"
+        },
+        {
+          "id": "strip_utility_scene_zero_guardrails",
+          "name": "Scene zero guardrails",
+          "description": "Keep expectations, boundaries, and campaign assumptions explicit.",
+          "body": "Before or between scenes, summarize boundaries, campaign assumptions, and the current social contract in compact terms. Surface tone drift early and keep the table aligned on expectations.",
+          "tags": [
+            "utility",
+            "scene_zero",
+            "guardrails"
+          ],
+          "variables": [],
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter"
+        }
+      ],
+      "promptStripAssignments": [
+        {
+          "id": "assign_world_frontier_graph",
+          "stripId": "strip_world_frontier_fantasy",
+          "target": {
+            "kind": "graph",
+            "tabId": "active_tab"
+          },
+          "mergeMode": "prepend",
+          "order": 0,
+          "enabled": true
+        },
+        {
+          "id": "assign_rules_graph",
+          "stripId": "strip_rules_light_narrative",
+          "target": {
+            "kind": "graph",
+            "tabId": "active_tab"
+          },
+          "mergeMode": "prepend",
+          "order": 1,
+          "enabled": true
+        },
+        {
+          "id": "assign_gm_conduct_graph",
+          "stripId": "strip_gm_fair_conduct",
+          "target": {
+            "kind": "graph",
+            "tabId": "active_tab"
+          },
+          "mergeMode": "prepend",
+          "order": 2,
+          "enabled": true
+        },
+        {
+          "id": "assign_npc_innkeeper",
+          "stripId": "strip_npc_innkeeper_persona",
+          "target": {
+            "kind": "subagent",
+            "tabId": "active_tab",
+            "groupName": "roadside_cast",
+            "agentName": "innkeeper"
+          },
+          "mergeMode": "replace_if_empty",
+          "order": 0,
+          "enabled": true
+        },
+        {
+          "id": "assign_npc_scout",
+          "stripId": "strip_npc_scout_persona",
+          "target": {
+            "kind": "subagent",
+            "tabId": "active_tab",
+            "groupName": "roadside_cast",
+            "agentName": "scout"
+          },
+          "mergeMode": "replace_if_empty",
+          "order": 0,
+          "enabled": true
+        },
+        {
+          "id": "assign_npc_guard",
+          "stripId": "strip_npc_guard_persona",
+          "target": {
+            "kind": "subagent",
+            "tabId": "active_tab",
+            "groupName": "roadside_cast",
+            "agentName": "guard"
+          },
+          "mergeMode": "replace_if_empty",
+          "order": 0,
+          "enabled": true
+        },
+        {
+          "id": "assign_tone_graph_adventure",
+          "stripId": "strip_tone_adventure_with_consequence",
+          "target": {
+            "kind": "graph",
+            "tabId": "starter_tab"
+          },
+          "mergeMode": "prepend",
+          "order": 3,
+          "enabled": true
+        }
+      ],
+      "moduleLibrary": [
+        {
+          "id": "module_jdr_world_frontier_fantasy",
+          "name": "Frontier Fantasy World",
+          "description": "Low-magic frontier frame for a grounded opening session.",
+          "category": "world",
+          "tags": [
+            "jdr",
+            "fantasy",
+            "frontier"
+          ],
+          "lineage": "branch_overlay",
+          "branchTargets": [
+            "main",
+            "jdr_demo"
+          ],
+          "recommendedProfile": "tabletop_demo",
+          "themeHints": [
+            "paper",
+            "fantasy"
+          ],
+          "compatibilityNotes": "Safe on trunk; richer presentation on the JDR demo branch.",
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter",
+          "promptStrips": [
+            {
+              "id": "strip_world_frontier_fantasy",
+              "name": "Frontier fantasy frame",
+              "description": "Grounded low-fantasy frontier assumptions.",
+              "body": "The world is a frontier fantasy setting: small communities, muddy roads, local politics, scarce magic, and consequences that carry forward from scene to scene.",
+              "tags": [
+                "world",
+                "fantasy",
+                "frontier"
+              ],
+              "variables": [],
+              "origin": "artifact",
+              "artifactRef": "jdr_solo_session_starter"
+            }
+          ],
+          "promptAssignments": [
+            {
+              "id": "world_graph",
+              "stripId": "strip_world_frontier_fantasy",
+              "targetKind": "graph",
+              "mergeMode": "prepend",
+              "order": 0,
+              "enabled": true
+            }
+          ],
+          "subagentGroups": [],
+          "starterArtifacts": [
+            {
+              "artifactId": "jdr_solo_session_starter",
+              "artifactKind": "graph",
+              "label": "Open session starter",
+              "description": "Runtime-backed solo session graph with the frontier-fantasy world frame."
+            }
+          ],
+          "runtimeContext": [
+            {
+              "key": "setting_id",
+              "value": "frontier_fantasy"
+            },
+            {
+              "key": "opening_location",
+              "value": "roadside_inn"
+            }
+          ]
+        },
+        {
+          "id": "module_jdr_world_occult_city",
+          "name": "Occult city setting",
+          "description": "Fog, factions, rites, and clues in a haunted metropolis.",
+          "category": "world",
+          "tags": [
+            "jdr",
+            "world",
+            "occult",
+            "city"
+          ],
+          "lineage": "branch_overlay",
+          "branchTargets": [
+            "jdr_demo"
+          ],
+          "recommendedProfile": "tabletop_demo",
+          "themeHints": [
+            "noir",
+            "paper",
+            "tabletop"
+          ],
+          "compatibilityNotes": "Optimized for investigation-first JDR sessions with bounded social complexity.",
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter",
+          "promptStrips": [
+            {
+              "id": "strip_world_occult_city",
+              "name": "Occult city setting",
+              "description": "Frame the session as an occult-noir city campaign.",
+              "body": "You are running an occult city setting: layered districts, secret societies, compromised institutions, public normalcy over hidden ritual danger, and clues embedded in social scenes.",
+              "tags": [
+                "world",
+                "occult",
+                "city"
+              ],
+              "variables": [],
+              "origin": "artifact",
+              "artifactRef": "jdr_solo_session_starter"
+            }
+          ],
+          "promptAssignments": [
+            {
+              "id": "world_graph_occult",
+              "stripId": "strip_world_occult_city",
+              "targetKind": "graph",
+              "mergeMode": "prepend",
+              "order": 0,
+              "enabled": true
+            }
+          ],
+          "subagentGroups": [],
+          "starterArtifacts": [
+            {
+              "artifactId": "jdr_solo_session_starter",
+              "artifactKind": "graph",
+              "label": "Open session starter",
+              "description": "Bounded LangGraph session starter."
+            }
+          ],
+          "runtimeContext": [
+            {
+              "key": "setting_id",
+              "value": "occult_city"
+            },
+            {
+              "key": "opening_location",
+              "value": "fog_district"
+            }
+          ]
+        },
+        {
+          "id": "module_jdr_world_space_outpost",
+          "name": "Space outpost setting",
+          "description": "A remote station of shortages, mystery, and operational pressure.",
+          "category": "world",
+          "tags": [
+            "jdr",
+            "world",
+            "space",
+            "outpost"
+          ],
+          "lineage": "branch_overlay",
+          "branchTargets": [
+            "jdr_demo"
+          ],
+          "recommendedProfile": "tabletop_demo",
+          "themeHints": [
+            "space",
+            "tabletop"
+          ],
+          "compatibilityNotes": "Seeded for the JDR demo branch.",
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter",
+          "promptStrips": [
+            {
+              "id": "strip_world_space_outpost",
+              "name": "Space outpost setting",
+              "description": "Frame the session as a pressure-cooker station campaign.",
+              "body": "You are running a remote space outpost setting: fragile infrastructure, rationed resources, layered chains of command, environmental hazards, and mystery framed through logistics and survival.",
+              "tags": [
+                "world",
+                "space",
+                "outpost"
+              ],
+              "variables": [],
+              "origin": "artifact",
+              "artifactRef": "jdr_solo_session_starter"
+            }
+          ],
+          "promptAssignments": [
+            {
+              "id": "world_graph_space",
+              "stripId": "strip_world_space_outpost",
+              "targetKind": "graph",
+              "mergeMode": "prepend",
+              "order": 0,
+              "enabled": true
+            }
+          ],
+          "subagentGroups": [],
+          "starterArtifacts": [
+            {
+              "artifactId": "jdr_solo_session_starter",
+              "artifactKind": "graph",
+              "label": "Open session starter",
+              "description": "Bounded LangGraph session starter."
+            }
+          ],
+          "runtimeContext": [
+            {
+              "key": "setting_id",
+              "value": "space_outpost"
+            },
+            {
+              "key": "opening_location",
+              "value": "docking_ring"
+            }
+          ]
+        },
+        {
+          "id": "module_jdr_rules_light_narrative",
+          "name": "Light Narrative Rules",
+          "description": "Prompt-backed rules stance for early sessions.",
+          "category": "rules",
+          "tags": [
+            "jdr",
+            "rules",
+            "light"
+          ],
+          "lineage": "branch_overlay",
+          "branchTargets": [
+            "jdr_demo"
+          ],
+          "recommendedProfile": "tabletop_demo",
+          "themeHints": [
+            "paper"
+          ],
+          "compatibilityNotes": "Structured rules helpers can layer on later without changing this starter.",
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter",
+          "promptStrips": [
+            {
+              "id": "strip_rules_light_narrative",
+              "name": "Light narrative rules stance",
+              "description": "Keeps resolution light while honoring uncertainty.",
+              "body": "Run a light narrative tabletop loop. Ask for rolls when outcomes are uncertain, stakes are meaningful, or risk is materially different depending on success or failure. Keep rulings clear and bounded.",
+              "tags": [
+                "rules",
+                "light",
+                "narrative"
+              ],
+              "variables": [],
+              "origin": "artifact",
+              "artifactRef": "jdr_solo_session_starter"
+            }
+          ],
+          "promptAssignments": [
+            {
+              "id": "rules_graph",
+              "stripId": "strip_rules_light_narrative",
+              "targetKind": "graph",
+              "mergeMode": "prepend",
+              "order": 1,
+              "enabled": true
+            }
+          ],
+          "subagentGroups": [],
+          "starterArtifacts": [
+            {
+              "artifactId": "jdr_solo_session_starter",
+              "artifactKind": "graph",
+              "label": "Open session starter",
+              "description": "Bounded session starter for this pack."
+            }
+          ],
+          "runtimeContext": [
+            {
+              "key": "rules_mode",
+              "value": "light_narrative"
+            }
+          ]
+        },
+        {
+          "id": "module_jdr_rules_dice_forward",
+          "name": "Dice-forward rules stance",
+          "description": "Escalate uncertain actions into explicit checks and consequences.",
+          "category": "rules",
+          "tags": [
+            "jdr",
+            "rules",
+            "dice"
+          ],
+          "lineage": "branch_overlay",
+          "branchTargets": [
+            "jdr_demo"
+          ],
+          "recommendedProfile": "tabletop_demo",
+          "themeHints": [
+            "tabletop"
+          ],
+          "compatibilityNotes": "Pairs with the structured rules referee helper without claiming a full rule engine.",
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter",
+          "promptStrips": [
+            {
+              "id": "strip_rules_dice_forward",
+              "name": "Dice-forward rules stance",
+              "description": "Prefer explicit checks, risk statements, and consequence ladders.",
+              "body": "Run a dice-forward tabletop loop. When intent is risky or uncertain, state the likely check, the difficulty, the stakes, and what changes on success, partial success, or failure before proceeding.",
+              "tags": [
+                "rules",
+                "dice",
+                "resolution"
+              ],
+              "variables": [],
+              "origin": "artifact",
+              "artifactRef": "jdr_solo_session_starter"
+            }
+          ],
+          "promptAssignments": [
+            {
+              "id": "rules_graph_dice",
+              "stripId": "strip_rules_dice_forward",
+              "targetKind": "graph",
+              "mergeMode": "prepend",
+              "order": 1,
+              "enabled": true
+            }
+          ],
+          "subagentGroups": [],
+          "starterArtifacts": [
+            {
+              "artifactId": "jdr_solo_session_starter",
+              "artifactKind": "graph",
+              "label": "Open session starter",
+              "description": "Bounded LangGraph session starter."
+            }
+          ],
+          "runtimeContext": [
+            {
+              "key": "rules_mode",
+              "value": "dice_forward"
+            },
+            {
+              "key": "difficulty_ladder",
+              "value": "6_10_14_18"
+            }
+          ]
+        },
+        {
+          "id": "module_jdr_persona_gm_fair_guide",
+          "name": "Fair Guide GM Persona",
+          "description": "GM behavior and tone overlays for the opening slice.",
+          "category": "persona",
+          "tags": [
+            "jdr",
+            "gm",
+            "persona"
+          ],
+          "lineage": "branch_overlay",
+          "branchTargets": [
+            "jdr_demo"
+          ],
+          "recommendedProfile": "tabletop_demo",
+          "themeHints": [
+            "tabletop"
+          ],
+          "compatibilityNotes": "GM conduct stays separate from tone so the JDR branch can swap tone packs without hidden global prompt changes.",
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter",
+          "promptStrips": [
+            {
+              "id": "strip_gm_fair_conduct",
+              "name": "Fair GM conduct",
+              "description": "A truthful GM stance.",
+              "body": "Act as a fair game master. Present the world clearly, ask concise clarifying follow-up only when needed for action resolution, keep consequences proportional, and never pretend a roll or fact exists when it has not been established.",
+              "tags": [
+                "gm",
+                "conduct",
+                "fairness"
+              ],
+              "variables": [],
+              "origin": "artifact",
+              "artifactRef": "jdr_solo_session_starter"
+            }
+          ],
+          "promptAssignments": [
+            {
+              "id": "gm_graph",
+              "stripId": "strip_gm_fair_conduct",
+              "targetKind": "graph",
+              "mergeMode": "prepend",
+              "order": 2,
+              "enabled": true
+            }
+          ],
+          "subagentGroups": [],
+          "starterArtifacts": [
+            {
+              "artifactId": "jdr_solo_session_starter",
+              "artifactKind": "graph",
+              "label": "Open session starter",
+              "description": "Bounded session starter for this pack."
+            }
+          ],
+          "runtimeContext": []
+        },
+        {
+          "id": "module_jdr_tone_adventure_with_consequence",
+          "name": "Adventure with consequence tone",
+          "description": "Heroic forward motion with meaningful setbacks and costs.",
+          "category": "utility",
+          "tags": [
+            "jdr",
+            "tone",
+            "adventure"
+          ],
+          "lineage": "branch_overlay",
+          "branchTargets": [
+            "jdr_demo"
+          ],
+          "recommendedProfile": "tabletop_demo",
+          "themeHints": [
+            "fantasy",
+            "tabletop"
+          ],
+          "compatibilityNotes": "Separate tone pack so guided tabletop setup can swap tone without mutating GM conduct.",
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter",
+          "promptStrips": [
+            {
+              "id": "strip_tone_adventure_with_consequence",
+              "name": "Adventure with consequence tone",
+              "description": "Keep the tone adventurous but grounded in consequence.",
+              "body": "Adopt an adventurous, playable tone with meaningful uncertainty and consequence. Reward initiative. Keep danger legible, avoid arbitrary punishment, and let victories change the scene.",
+              "tags": [
+                "tone",
+                "adventure",
+                "consequence"
+              ],
+              "variables": [],
+              "origin": "artifact",
+              "artifactRef": "jdr_solo_session_starter"
+            }
+          ],
+          "promptAssignments": [
+            {
+              "id": "tone_graph_adventure",
+              "stripId": "strip_tone_adventure_with_consequence",
+              "targetKind": "graph",
+              "mergeMode": "prepend",
+              "order": 3,
+              "enabled": true
+            }
+          ],
+          "subagentGroups": [],
+          "starterArtifacts": [
+            {
+              "artifactId": "jdr_solo_session_starter",
+              "artifactKind": "graph",
+              "label": "Open session starter",
+              "description": "Bounded LangGraph session starter."
+            }
+          ],
+          "runtimeContext": [
+            {
+              "key": "tone_mode",
+              "value": "adventurous_grounded"
+            }
+          ]
+        },
+        {
+          "id": "module_jdr_tone_mystery_pressure",
+          "name": "Mystery under pressure tone",
+          "description": "Investigation-focused tone with tension, clues, and uncertainty.",
+          "category": "utility",
+          "tags": [
+            "jdr",
+            "tone",
+            "mystery"
+          ],
+          "lineage": "branch_overlay",
+          "branchTargets": [
+            "jdr_demo"
+          ],
+          "recommendedProfile": "tabletop_demo",
+          "themeHints": [
+            "noir",
+            "paper",
+            "tabletop"
+          ],
+          "compatibilityNotes": "Seeded for the JDR demo branch.",
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter",
+          "promptStrips": [
+            {
+              "id": "strip_tone_mystery_pressure",
+              "name": "Mystery under pressure tone",
+              "description": "Bias scenes toward clues, suspicion, and mounting pressure.",
+              "body": "Run scenes as tense investigation. Surface clues gradually, keep uncertainty legible, and make every answer create a new question, risk, or obligation.",
+              "tags": [
+                "tone",
+                "mystery",
+                "pressure"
+              ],
+              "variables": [],
+              "origin": "artifact",
+              "artifactRef": "jdr_solo_session_starter"
+            }
+          ],
+          "promptAssignments": [
+            {
+              "id": "tone_graph_mystery",
+              "stripId": "strip_tone_mystery_pressure",
+              "targetKind": "graph",
+              "mergeMode": "prepend",
+              "order": 3,
+              "enabled": true
+            }
+          ],
+          "subagentGroups": [],
+          "starterArtifacts": [
+            {
+              "artifactId": "jdr_solo_session_starter",
+              "artifactKind": "graph",
+              "label": "Open session starter",
+              "description": "Bounded LangGraph session starter."
+            }
+          ],
+          "runtimeContext": [
+            {
+              "key": "tone_mode",
+              "value": "mystery_pressure"
+            }
+          ]
+        },
+        {
+          "id": "module_jdr_tone_grim_consequences",
+          "name": "Grim consequences tone",
+          "description": "Harsher survival-forward tone with attrition and tradeoffs.",
+          "category": "utility",
+          "tags": [
+            "jdr",
+            "tone",
+            "grim"
+          ],
+          "lineage": "branch_overlay",
+          "branchTargets": [
+            "jdr_demo"
+          ],
+          "recommendedProfile": "tabletop_demo",
+          "themeHints": [
+            "grim",
+            "tabletop"
+          ],
+          "compatibilityNotes": "Seeded for the JDR demo branch.",
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter",
+          "promptStrips": [
+            {
+              "id": "strip_tone_grim_consequences",
+              "name": "Grim consequences tone",
+              "description": "Bias scenes toward cost, scarcity, and difficult tradeoffs.",
+              "body": "Keep the tone grim, resource-aware, and consequence-heavy. Present hard choices, visible attrition, and persistent aftermath. Avoid melodrama; make pressure concrete.",
+              "tags": [
+                "tone",
+                "grim",
+                "consequence"
+              ],
+              "variables": [],
+              "origin": "artifact",
+              "artifactRef": "jdr_solo_session_starter"
+            }
+          ],
+          "promptAssignments": [
+            {
+              "id": "tone_graph_grim",
+              "stripId": "strip_tone_grim_consequences",
+              "targetKind": "graph",
+              "mergeMode": "prepend",
+              "order": 3,
+              "enabled": true
+            }
+          ],
+          "subagentGroups": [],
+          "starterArtifacts": [
+            {
+              "artifactId": "jdr_solo_session_starter",
+              "artifactKind": "graph",
+              "label": "Open session starter",
+              "description": "Bounded LangGraph session starter."
+            }
+          ],
+          "runtimeContext": [
+            {
+              "key": "tone_mode",
+              "value": "grim_consequences"
+            }
+          ]
+        },
+        {
+          "id": "module_jdr_party_roadside_cast",
+          "name": "Roadside Cast",
+          "description": "Small opening cast for social pressure and local texture.",
+          "category": "party",
+          "tags": [
+            "jdr",
+            "party",
+            "npc"
+          ],
+          "lineage": "branch_overlay",
+          "branchTargets": [
+            "jdr_demo"
+          ],
+          "recommendedProfile": "tabletop_demo",
+          "themeHints": [
+            "paper",
+            "fantasy"
+          ],
+          "compatibilityNotes": "Uses bounded subagent groups rather than a new multi-agent runtime.",
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter",
+          "promptStrips": [
+            {
+              "id": "strip_npc_innkeeper_persona",
+              "name": "Innkeeper persona",
+              "description": "Innkeeper speaking style and priorities.",
+              "body": "Speak as an innkeeper who is warm at first contact, discreetly observant, willing to trade rumors for trust, and reluctant to endanger the establishment.",
+              "tags": [
+                "npc",
+                "innkeeper"
+              ],
+              "variables": [],
+              "origin": "artifact",
+              "artifactRef": "jdr_solo_session_starter"
+            },
+            {
+              "id": "strip_npc_scout_persona",
+              "name": "Scout persona",
+              "description": "Scout speaking style and priorities.",
+              "body": "Speak as a practical scout who notices terrain, timing, tracks, and risk first. Be concise, field-tested, and cautious without becoming fearful.",
+              "tags": [
+                "npc",
+                "scout"
+              ],
+              "variables": [],
+              "origin": "artifact",
+              "artifactRef": "jdr_solo_session_starter"
+            },
+            {
+              "id": "strip_npc_guard_persona",
+              "name": "Guard persona",
+              "description": "Guard speaking style and priorities.",
+              "body": "Speak as a town guard who values order, procedure, and visible control. Be suspicious of strangers, but responsive to clear respect and lawful intent.",
+              "tags": [
+                "npc",
+                "guard"
+              ],
+              "variables": [],
+              "origin": "artifact",
+              "artifactRef": "jdr_solo_session_starter"
+            }
+          ],
+          "promptAssignments": [
+            {
+              "id": "party_innkeeper",
+              "stripId": "strip_npc_innkeeper_persona",
+              "targetKind": "subagent",
+              "groupName": "roadside_cast",
+              "agentName": "innkeeper",
+              "mergeMode": "replace_if_empty",
+              "order": 0,
+              "enabled": true
+            },
+            {
+              "id": "party_scout",
+              "stripId": "strip_npc_scout_persona",
+              "targetKind": "subagent",
+              "groupName": "roadside_cast",
+              "agentName": "scout",
+              "mergeMode": "replace_if_empty",
+              "order": 0,
+              "enabled": true
+            },
+            {
+              "id": "party_guard",
+              "stripId": "strip_npc_guard_persona",
+              "targetKind": "subagent",
+              "groupName": "roadside_cast",
+              "agentName": "guard",
+              "mergeMode": "replace_if_empty",
+              "order": 0,
+              "enabled": true
+            }
+          ],
+          "subagentGroups": [
+            {
+              "name": "roadside_cast",
+              "agents": [
+                {
+                  "name": "innkeeper",
+                  "systemPrompt": "",
+                  "tools": [],
+                  "description": "Warm host, rumor broker, protective of the inn and its regulars."
+                },
+                {
+                  "name": "scout",
+                  "systemPrompt": "",
+                  "tools": [],
+                  "description": "Alert traveler, track reader, practical about danger and weather."
+                },
+                {
+                  "name": "guard",
+                  "systemPrompt": "",
+                  "tools": [],
+                  "description": "Suspicious town guard, watches for trouble, respects strength and order."
+                }
+              ]
+            }
+          ],
+          "starterArtifacts": [
+            {
+              "artifactId": "jdr_solo_session_starter",
+              "artifactKind": "graph",
+              "label": "Open session starter",
+              "description": "Bounded session starter for this pack."
+            }
+          ],
+          "runtimeContext": [
+            {
+              "key": "current_scene",
+              "value": "opening_arrival"
+            }
+          ]
+        },
+        {
+          "id": "module_jdr_party_investigator_contacts",
+          "name": "Investigator contacts",
+          "description": "A bounded contact network for occult investigation scenes.",
+          "category": "party",
+          "tags": [
+            "jdr",
+            "party",
+            "contacts"
+          ],
+          "lineage": "branch_overlay",
+          "branchTargets": [
+            "jdr_demo"
+          ],
+          "recommendedProfile": "tabletop_demo",
+          "themeHints": [
+            "noir",
+            "paper",
+            "tabletop"
+          ],
+          "compatibilityNotes": "Alternative bounded cast for investigation-led sessions.",
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter",
+          "promptStrips": [
+            {
+              "id": "strip_npc_fixer_persona",
+              "name": "Speak as the fixer",
+              "description": "Streetwise broker of access, rumors, and debts.",
+              "body": "Speak as a discreet fixer. Trade access, rumors, and favors with precise prices and implied risks. Keep speech concise, wary, and transactional.",
+              "tags": [
+                "npc",
+                "fixer"
+              ],
+              "variables": [],
+              "origin": "artifact",
+              "artifactRef": "jdr_solo_session_starter"
+            },
+            {
+              "id": "strip_npc_librarian_persona",
+              "name": "Speak as the librarian",
+              "description": "Custodian of records, patterns, and hidden references.",
+              "body": "Speak as an erudite occult librarian. Prioritize references, fragments, patterns, and caveats. Offer insight with hesitation when the material is dangerous.",
+              "tags": [
+                "npc",
+                "librarian"
+              ],
+              "variables": [],
+              "origin": "artifact",
+              "artifactRef": "jdr_solo_session_starter"
+            },
+            {
+              "id": "strip_npc_inspector_persona",
+              "name": "Speak as the inspector",
+              "description": "Methodical investigator balancing truth and institutional pressure.",
+              "body": "Speak as a pressured inspector. Focus on procedures, contradictions, timelines, and institutional constraints. Let duty and suspicion shape the voice.",
+              "tags": [
+                "npc",
+                "inspector"
+              ],
+              "variables": [],
+              "origin": "artifact",
+              "artifactRef": "jdr_solo_session_starter"
+            }
+          ],
+          "promptAssignments": [
+            {
+              "id": "party_contacts_fixer",
+              "stripId": "strip_npc_fixer_persona",
+              "targetKind": "subagent",
+              "mergeMode": "replace_if_empty",
+              "order": 0,
+              "enabled": true,
+              "groupName": "contacts_circle",
+              "agentName": "fixer"
+            },
+            {
+              "id": "party_contacts_librarian",
+              "stripId": "strip_npc_librarian_persona",
+              "targetKind": "subagent",
+              "mergeMode": "replace_if_empty",
+              "order": 0,
+              "enabled": true,
+              "groupName": "contacts_circle",
+              "agentName": "librarian"
+            },
+            {
+              "id": "party_contacts_inspector",
+              "stripId": "strip_npc_inspector_persona",
+              "targetKind": "subagent",
+              "mergeMode": "replace_if_empty",
+              "order": 0,
+              "enabled": true,
+              "groupName": "contacts_circle",
+              "agentName": "inspector"
+            }
+          ],
+          "subagentGroups": [
+            {
+              "name": "contacts_circle",
+              "agents": [
+                {
+                  "name": "fixer",
+                  "description": "Access broker and rumor merchant for the occult underground.",
+                  "systemPrompt": "Be a discreet fixer who knows who can be paid, pressured, or persuaded.",
+                  "tools": []
+                },
+                {
+                  "name": "librarian",
+                  "description": "Custodian of forbidden references and historical fragments.",
+                  "systemPrompt": "Be a careful occult librarian who reveals just enough to remain useful.",
+                  "tools": []
+                },
+                {
+                  "name": "inspector",
+                  "description": "Institutional investigator under pressure from above and below.",
+                  "systemPrompt": "Be a disciplined inspector balancing fact, risk, and chain-of-command pressure.",
+                  "tools": []
+                }
+              ]
+            }
+          ],
+          "starterArtifacts": [
+            {
+              "artifactId": "jdr_solo_session_starter",
+              "artifactKind": "graph",
+              "label": "Open session starter",
+              "description": "Bounded LangGraph session starter."
+            }
+          ],
+          "runtimeContext": [
+            {
+              "key": "current_scene",
+              "value": "case_opening"
+            }
+          ]
+        },
+        {
+          "id": "module_jdr_party_station_crew",
+          "name": "Station crew",
+          "description": "A bounded operational cast for remote outpost play.",
+          "category": "party",
+          "tags": [
+            "jdr",
+            "party",
+            "space"
+          ],
+          "lineage": "branch_overlay",
+          "branchTargets": [
+            "jdr_demo"
+          ],
+          "recommendedProfile": "tabletop_demo",
+          "themeHints": [
+            "space",
+            "tabletop"
+          ],
+          "compatibilityNotes": "Seeded for the JDR demo branch.",
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter",
+          "promptStrips": [
+            {
+              "id": "strip_npc_quartermaster_persona",
+              "name": "Speak as the quartermaster",
+              "description": "Inventory-first survivor who thinks in shortages and leverage.",
+              "body": "Speak as the quartermaster. Think in shortages, substitutions, quotas, and leverage. Make every answer concrete and operational.",
+              "tags": [
+                "npc",
+                "quartermaster"
+              ],
+              "variables": [],
+              "origin": "artifact",
+              "artifactRef": "jdr_solo_session_starter"
+            },
+            {
+              "id": "strip_npc_pilot_persona",
+              "name": "Speak as the pilot",
+              "description": "Fast, competent, and always aware of route and risk.",
+              "body": "Speak as the pilot. Focus on vectors, timing, hazards, and what a competent crew can still salvage when plans fail.",
+              "tags": [
+                "npc",
+                "pilot"
+              ],
+              "variables": [],
+              "origin": "artifact",
+              "artifactRef": "jdr_solo_session_starter"
+            },
+            {
+              "id": "strip_npc_security_chief_persona",
+              "name": "Speak as the security chief",
+              "description": "Protective, suspicious, and alert to human failure under stress.",
+              "body": "Speak as the security chief. Weigh threats, procedure, morale, and containment. Assume that pressure makes people dangerous.",
+              "tags": [
+                "npc",
+                "security"
+              ],
+              "variables": [],
+              "origin": "artifact",
+              "artifactRef": "jdr_solo_session_starter"
+            }
+          ],
+          "promptAssignments": [
+            {
+              "id": "party_station_quartermaster",
+              "stripId": "strip_npc_quartermaster_persona",
+              "targetKind": "subagent",
+              "mergeMode": "replace_if_empty",
+              "order": 0,
+              "enabled": true,
+              "groupName": "station_crew",
+              "agentName": "quartermaster"
+            },
+            {
+              "id": "party_station_pilot",
+              "stripId": "strip_npc_pilot_persona",
+              "targetKind": "subagent",
+              "mergeMode": "replace_if_empty",
+              "order": 0,
+              "enabled": true,
+              "groupName": "station_crew",
+              "agentName": "pilot"
+            },
+            {
+              "id": "party_station_security",
+              "stripId": "strip_npc_security_chief_persona",
+              "targetKind": "subagent",
+              "mergeMode": "replace_if_empty",
+              "order": 0,
+              "enabled": true,
+              "groupName": "station_crew",
+              "agentName": "security_chief"
+            }
+          ],
+          "subagentGroups": [
+            {
+              "name": "station_crew",
+              "agents": [
+                {
+                  "name": "quartermaster",
+                  "description": "Keeps the station alive through rationing and substitutions.",
+                  "systemPrompt": "Be the quartermaster: practical, unsentimental, and impossible to impress with hand-waving.",
+                  "tools": []
+                },
+                {
+                  "name": "pilot",
+                  "description": "Moves people and equipment through risk and bad timing.",
+                  "systemPrompt": "Be the pilot: calm under pressure, spatially precise, and good at contingency planning.",
+                  "tools": []
+                },
+                {
+                  "name": "security_chief",
+                  "description": "Keeps order when systems and people both degrade.",
+                  "systemPrompt": "Be the security chief: procedural, protective, and suspicious of optimistic assumptions.",
+                  "tools": []
+                }
+              ]
+            }
+          ],
+          "starterArtifacts": [
+            {
+              "artifactId": "jdr_solo_session_starter",
+              "artifactKind": "graph",
+              "label": "Open session starter",
+              "description": "Bounded LangGraph session starter."
+            }
+          ],
+          "runtimeContext": [
+            {
+              "key": "current_scene",
+              "value": "docking_briefing"
+            }
+          ]
+        },
+        {
+          "id": "module_jdr_utility_structured_referee",
+          "name": "Structured rules referee helper",
+          "description": "Bounded helper for compact adjudication and explicit consequence framing.",
+          "category": "utility",
+          "tags": [
+            "jdr",
+            "utility",
+            "rules",
+            "helper"
+          ],
+          "lineage": "branch_overlay",
+          "branchTargets": [
+            "jdr_demo"
+          ],
+          "recommendedProfile": "tabletop_demo",
+          "themeHints": [
+            "tabletop"
+          ],
+          "compatibilityNotes": "Adds a bounded rules referee helper without claiming full rules-engine support.",
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter",
+          "promptStrips": [],
+          "promptAssignments": [],
+          "subagentGroups": [],
+          "starterArtifacts": [
+            {
+              "artifactId": "jdr_solo_session_starter",
+              "artifactKind": "graph",
+              "label": "Open session starter",
+              "description": "Bounded LangGraph session starter."
+            }
+          ],
+          "runtimeContext": [
+            {
+              "key": "rules_helper",
+              "value": "structured_referee"
+            }
+          ]
+        },
+        {
+          "id": "module_jdr_utility_session_recap",
+          "name": "Session Recap Utility",
+          "description": "Reserved bounded utility slot for later recap and scribe helpers.",
+          "category": "utility",
+          "tags": [
+            "jdr",
+            "utility",
+            "recap"
+          ],
+          "lineage": "branch_overlay",
+          "branchTargets": [
+            "jdr_demo"
+          ],
+          "recommendedProfile": "tabletop_demo",
+          "themeHints": [
+            "paper",
+            "tabletop"
+          ],
+          "compatibilityNotes": "Included as a bounded module placeholder; not loaded by default in v95.",
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter",
+          "promptStrips": [],
+          "promptAssignments": [],
+          "subagentGroups": [],
+          "starterArtifacts": [
+            {
+              "artifactId": "jdr_solo_session_starter",
+              "artifactKind": "graph",
+              "label": "Open session starter",
+              "description": "Bounded session starter for this pack."
+            }
+          ],
+          "runtimeContext": []
+        },
+        {
+          "id": "module_jdr_world_ruined_coast",
+          "name": "Ruined coast setting",
+          "description": "Salt-worn frontier of wrecks, tides, and exposed ruins.",
+          "category": "world",
+          "tags": [
+            "jdr",
+            "world",
+            "coast",
+            "ruin"
+          ],
+          "lineage": "branch_overlay",
+          "branchTargets": [
+            "jdr_demo"
+          ],
+          "recommendedProfile": "tabletop_demo",
+          "themeHints": [
+            "paper",
+            "storm",
+            "ruin"
+          ],
+          "compatibilityNotes": "Safe on trunk; richer presentation on the JDR demo branch.",
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter",
+          "promptStrips": [
+            {
+              "id": "strip_world_ruined_coast",
+              "name": "Ruined coast setting",
+              "description": "Storm-worn littoral frontier shaped by wreckage and half-drowned ruins.",
+              "body": "You are running a ruined coast setting: salt-scoured strongholds, wreck towns, dangerous tides, lighthouse politics, and old ruins surfacing whenever storms tear the shoreline open.",
+              "tags": [
+                "world",
+                "ruined",
+                "coast"
+              ],
+              "variables": [],
+              "origin": "artifact",
+              "artifactRef": "jdr_solo_session_starter"
+            }
+          ],
+          "promptAssignments": [
+            {
+              "id": "world_graph_ruined_coast",
+              "stripId": "strip_world_ruined_coast",
+              "targetKind": "graph",
+              "mergeMode": "prepend",
+              "order": 0,
+              "enabled": true
+            }
+          ],
+          "subagentGroups": [],
+          "starterArtifacts": [
+            {
+              "artifactId": "jdr_solo_session_starter",
+              "artifactKind": "graph",
+              "label": "Open session starter",
+              "description": "Bounded LangGraph session starter."
+            }
+          ],
+          "runtimeContext": [
+            {
+              "key": "setting_id",
+              "value": "ruined_coast"
+            },
+            {
+              "key": "opening_location",
+              "value": "stormbreak_harbor"
+            }
+          ]
+        },
+        {
+          "id": "module_jdr_world_corporate_arcology",
+          "name": "Corporate arcology setting",
+          "description": "Vertical corporate habitat under surveillance and hidden unrest.",
+          "category": "world",
+          "tags": [
+            "jdr",
+            "world",
+            "arcology",
+            "corporate"
+          ],
+          "lineage": "branch_overlay",
+          "branchTargets": [
+            "jdr_demo"
+          ],
+          "recommendedProfile": "tabletop_demo",
+          "themeHints": [
+            "neon",
+            "urban",
+            "corporate"
+          ],
+          "compatibilityNotes": "Safe on trunk; richer presentation on the JDR demo branch.",
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter",
+          "promptStrips": [
+            {
+              "id": "strip_world_corporate_arcology",
+              "name": "Corporate arcology setting",
+              "description": "Layered corporate habitat with service corridors, surveillance, and buried unrest.",
+              "body": "You are running a corporate arcology setting: stacked districts, badge-gated services, private security, outsourced maintenance, and hidden resistance networks moving through vents, service spines, and underlevels.",
+              "tags": [
+                "world",
+                "corporate",
+                "arcology"
+              ],
+              "variables": [],
+              "origin": "artifact",
+              "artifactRef": "jdr_solo_session_starter"
+            }
+          ],
+          "promptAssignments": [
+            {
+              "id": "world_graph_corporate_arcology",
+              "stripId": "strip_world_corporate_arcology",
+              "targetKind": "graph",
+              "mergeMode": "prepend",
+              "order": 0,
+              "enabled": true
+            }
+          ],
+          "subagentGroups": [],
+          "starterArtifacts": [
+            {
+              "artifactId": "jdr_solo_session_starter",
+              "artifactKind": "graph",
+              "label": "Open session starter",
+              "description": "Bounded LangGraph session starter."
+            }
+          ],
+          "runtimeContext": [
+            {
+              "key": "setting_id",
+              "value": "corporate_arcology"
+            },
+            {
+              "key": "opening_location",
+              "value": "service_spine"
+            }
+          ]
+        },
+        {
+          "id": "module_jdr_rules_fiction_first_pressure",
+          "name": "Fiction-first pressure rules stance",
+          "description": "Resolve from fiction first, then call explicit checks only when risk remains.",
+          "category": "rules",
+          "tags": [
+            "jdr",
+            "rules",
+            "fiction-first",
+            "pressure"
+          ],
+          "lineage": "branch_overlay",
+          "branchTargets": [
+            "jdr_demo"
+          ],
+          "recommendedProfile": "tabletop_demo",
+          "themeHints": [
+            "tabletop",
+            "pressure"
+          ],
+          "compatibilityNotes": "Seeded for the JDR demo branch.",
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter",
+          "promptStrips": [
+            {
+              "id": "strip_rules_fiction_first_pressure",
+              "name": "Fiction-first pressure rules stance",
+              "description": "Escalate pressure from fiction before reaching for explicit mechanics.",
+              "body": "Run a fiction-first pressure loop. Let position, leverage, and consequences emerge from the fiction before naming a roll. Ask for explicit checks only when uncertainty survives the fiction and the stakes materially matter.",
+              "tags": [
+                "rules",
+                "fiction",
+                "first",
+                "pressure"
+              ],
+              "variables": [],
+              "origin": "artifact",
+              "artifactRef": "jdr_solo_session_starter"
+            }
+          ],
+          "promptAssignments": [
+            {
+              "id": "rules_graph_fiction_first_pressure",
+              "stripId": "strip_rules_fiction_first_pressure",
+              "targetKind": "graph",
+              "mergeMode": "prepend",
+              "order": 0,
+              "enabled": true
+            }
+          ],
+          "subagentGroups": [],
+          "starterArtifacts": [
+            {
+              "artifactId": "jdr_solo_session_starter",
+              "artifactKind": "graph",
+              "label": "Open session starter",
+              "description": "Bounded LangGraph session starter."
+            }
+          ],
+          "runtimeContext": [
+            {
+              "key": "rules_mode",
+              "value": "fiction_first_pressure"
+            }
+          ]
+        },
+        {
+          "id": "module_jdr_rules_hard_choice_clocks",
+          "name": "Hard-choice clocks rules stance",
+          "description": "Use visible clocks, escalating pressure, and consequential tradeoffs.",
+          "category": "rules",
+          "tags": [
+            "jdr",
+            "rules",
+            "clocks",
+            "tradeoffs"
+          ],
+          "lineage": "branch_overlay",
+          "branchTargets": [
+            "jdr_demo"
+          ],
+          "recommendedProfile": "tabletop_demo",
+          "themeHints": [
+            "tabletop",
+            "clocks"
+          ],
+          "compatibilityNotes": "Seeded for the JDR demo branch.",
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter",
+          "promptStrips": [
+            {
+              "id": "strip_rules_hard_choice_clocks",
+              "name": "Hard-choice clocks rules stance",
+              "description": "Track pressure openly and turn progress into visible tradeoffs.",
+              "body": "Run a hard-choice clock loop. Track danger, progress, and response openly. When players push forward, advance clocks, create visible costs, and force tradeoffs instead of flattening outcomes into simple pass/fail.",
+              "tags": [
+                "rules",
+                "clocks",
+                "hard_choice"
+              ],
+              "variables": [],
+              "origin": "artifact",
+              "artifactRef": "jdr_solo_session_starter"
+            }
+          ],
+          "promptAssignments": [
+            {
+              "id": "rules_graph_hard_choice_clocks",
+              "stripId": "strip_rules_hard_choice_clocks",
+              "targetKind": "graph",
+              "mergeMode": "prepend",
+              "order": 0,
+              "enabled": true
+            }
+          ],
+          "subagentGroups": [],
+          "starterArtifacts": [
+            {
+              "artifactId": "jdr_solo_session_starter",
+              "artifactKind": "graph",
+              "label": "Open session starter",
+              "description": "Bounded LangGraph session starter."
+            }
+          ],
+          "runtimeContext": [
+            {
+              "key": "rules_mode",
+              "value": "hard_choice_clocks"
+            }
+          ]
+        },
+        {
+          "id": "module_jdr_tone_hopeful_resistance",
+          "name": "Hopeful resistance tone",
+          "description": "Pressure remains real, but solidarity and openings matter.",
+          "category": "utility",
+          "tags": [
+            "jdr",
+            "tone",
+            "hopeful",
+            "resistance"
+          ],
+          "lineage": "branch_overlay",
+          "branchTargets": [
+            "jdr_demo"
+          ],
+          "recommendedProfile": "tabletop_demo",
+          "themeHints": [
+            "tabletop",
+            "hopeful"
+          ],
+          "compatibilityNotes": "Seeded for the JDR demo branch.",
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter",
+          "promptStrips": [
+            {
+              "id": "strip_tone_hopeful_resistance",
+              "name": "Hopeful resistance tone",
+              "description": "Keep pressure real while leaving room for solidarity and earned momentum.",
+              "body": "Maintain a tone of hopeful resistance. Pressure should be real, but victories should create solidarity, local trust, and visible openings against stronger systems.",
+              "tags": [
+                "tone",
+                "hopeful",
+                "resistance"
+              ],
+              "variables": [],
+              "origin": "artifact",
+              "artifactRef": "jdr_solo_session_starter"
+            }
+          ],
+          "promptAssignments": [
+            {
+              "id": "tone_graph_hopeful_resistance",
+              "stripId": "strip_tone_hopeful_resistance",
+              "targetKind": "graph",
+              "mergeMode": "append",
+              "order": 0,
+              "enabled": true
+            }
+          ],
+          "subagentGroups": [],
+          "starterArtifacts": [
+            {
+              "artifactId": "jdr_solo_session_starter",
+              "artifactKind": "graph",
+              "label": "Open session starter",
+              "description": "Bounded LangGraph session starter."
+            }
+          ],
+          "runtimeContext": [
+            {
+              "key": "tone_mode",
+              "value": "hopeful_resistance"
+            }
+          ]
+        },
+        {
+          "id": "module_jdr_tone_paranoid_intrigue",
+          "name": "Paranoid intrigue tone",
+          "description": "Loyalties fray, surveillance tightens, and every answer carries risk.",
+          "category": "utility",
+          "tags": [
+            "jdr",
+            "tone",
+            "paranoid",
+            "intrigue"
+          ],
+          "lineage": "branch_overlay",
+          "branchTargets": [
+            "jdr_demo"
+          ],
+          "recommendedProfile": "tabletop_demo",
+          "themeHints": [
+            "tabletop",
+            "intrigue"
+          ],
+          "compatibilityNotes": "Seeded for the JDR demo branch.",
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter",
+          "promptStrips": [
+            {
+              "id": "strip_tone_paranoid_intrigue",
+              "name": "Paranoid intrigue tone",
+              "description": "Bias scenes toward double meanings, surveillance, and compromised loyalties.",
+              "body": "Maintain a paranoid intrigue tone. Let information feel expensive, loyalties unstable, and every alliance vulnerable to pressure, blackmail, or divided priorities.",
+              "tags": [
+                "tone",
+                "paranoid",
+                "intrigue"
+              ],
+              "variables": [],
+              "origin": "artifact",
+              "artifactRef": "jdr_solo_session_starter"
+            }
+          ],
+          "promptAssignments": [
+            {
+              "id": "tone_graph_paranoid_intrigue",
+              "stripId": "strip_tone_paranoid_intrigue",
+              "targetKind": "graph",
+              "mergeMode": "append",
+              "order": 0,
+              "enabled": true
+            }
+          ],
+          "subagentGroups": [],
+          "starterArtifacts": [
+            {
+              "artifactId": "jdr_solo_session_starter",
+              "artifactKind": "graph",
+              "label": "Open session starter",
+              "description": "Bounded LangGraph session starter."
+            }
+          ],
+          "runtimeContext": [
+            {
+              "key": "tone_mode",
+              "value": "paranoid_intrigue"
+            }
+          ]
+        },
+        {
+          "id": "module_jdr_party_relic_hunters",
+          "name": "Relic hunters",
+          "description": "A mobile trio tuned for salvage, ruins, and occult risk.",
+          "category": "party",
+          "tags": [
+            "jdr",
+            "party",
+            "relic",
+            "expedition"
+          ],
+          "lineage": "branch_overlay",
+          "branchTargets": [
+            "jdr_demo"
+          ],
+          "recommendedProfile": "tabletop_demo",
+          "themeHints": [
+            "tabletop",
+            "ruin"
+          ],
+          "compatibilityNotes": "Seeded for the JDR demo branch.",
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter",
+          "promptStrips": [
+            {
+              "id": "strip_npc_broker_persona",
+              "name": "Speak as the broker",
+              "description": "Deal-maker who prices everything in opportunity, favors, and exposure.",
+              "body": "Speak as the broker. Measure people by leverage, timing, and what can be exchanged without showing your full hand.",
+              "tags": [
+                "npc",
+                "broker"
+              ],
+              "variables": [],
+              "origin": "artifact",
+              "artifactRef": "jdr_solo_session_starter"
+            },
+            {
+              "id": "strip_npc_outrider_persona",
+              "name": "Speak as the outrider",
+              "description": "Fast-moving pathfinder who reads risk before others see it.",
+              "body": "Speak as the outrider. Notice routes, chokepoints, weather, and ambush geometry first. Keep your advice practical and mobile.",
+              "tags": [
+                "npc",
+                "outrider"
+              ],
+              "variables": [],
+              "origin": "artifact",
+              "artifactRef": "jdr_solo_session_starter"
+            },
+            {
+              "id": "strip_npc_occultist_persona",
+              "name": "Speak as the occultist",
+              "description": "Scholar-practitioner who reads omens, ritual residue, and hidden cost.",
+              "body": "Speak as the occultist. Focus on signs, correspondences, residue, and the price attached to hidden power. Be precise rather than theatrical.",
+              "tags": [
+                "npc",
+                "occultist"
+              ],
+              "variables": [],
+              "origin": "artifact",
+              "artifactRef": "jdr_solo_session_starter"
+            }
+          ],
+          "promptAssignments": [
+            {
+              "id": "party_relic_broker",
+              "stripId": "strip_npc_broker_persona",
+              "targetKind": "subagent",
+              "mergeMode": "replace_if_empty",
+              "order": 0,
+              "enabled": true,
+              "groupName": "relic_hunters",
+              "agentName": "broker"
+            },
+            {
+              "id": "party_relic_outrider",
+              "stripId": "strip_npc_outrider_persona",
+              "targetKind": "subagent",
+              "mergeMode": "replace_if_empty",
+              "order": 0,
+              "enabled": true,
+              "groupName": "relic_hunters",
+              "agentName": "outrider"
+            },
+            {
+              "id": "party_relic_occultist",
+              "stripId": "strip_npc_occultist_persona",
+              "targetKind": "subagent",
+              "mergeMode": "replace_if_empty",
+              "order": 0,
+              "enabled": true,
+              "groupName": "relic_hunters",
+              "agentName": "occultist"
+            }
+          ],
+          "subagentGroups": [
+            {
+              "name": "relic_hunters",
+              "agents": [
+                {
+                  "name": "broker",
+                  "description": "Fixes access, buyers, and off-books arrangements.",
+                  "systemPrompt": "Be the broker: calm, transactional, discreet, and always aware of leverage.",
+                  "tools": []
+                },
+                {
+                  "name": "outrider",
+                  "description": "Keeps the expedition mobile and alive beyond mapped routes.",
+                  "systemPrompt": "Be the outrider: alert, practical, route-focused, and intolerant of avoidable exposure.",
+                  "tools": []
+                },
+                {
+                  "name": "occultist",
+                  "description": "Interprets symbols, rituals, and hidden cost around relics.",
+                  "systemPrompt": "Be the occultist: exact, literate in hidden systems, and attentive to ritual cost.",
+                  "tools": []
+                }
+              ]
+            }
+          ],
+          "starterArtifacts": [
+            {
+              "artifactId": "jdr_solo_session_starter",
+              "artifactKind": "graph",
+              "label": "Open session starter",
+              "description": "Bounded LangGraph session starter."
+            }
+          ],
+          "runtimeContext": [
+            {
+              "key": "current_scene",
+              "value": "salvage_briefing"
+            }
+          ]
+        },
+        {
+          "id": "module_jdr_party_response_team",
+          "name": "Response team",
+          "description": "A procedural trio built for breaches, casualties, and unstable systems.",
+          "category": "party",
+          "tags": [
+            "jdr",
+            "party",
+            "response",
+            "operations"
+          ],
+          "lineage": "branch_overlay",
+          "branchTargets": [
+            "jdr_demo"
+          ],
+          "recommendedProfile": "tabletop_demo",
+          "themeHints": [
+            "tabletop",
+            "operations"
+          ],
+          "compatibilityNotes": "Seeded for the JDR demo branch.",
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter",
+          "promptStrips": [
+            {
+              "id": "strip_npc_medic_persona",
+              "name": "Speak as the medic",
+              "description": "Calm triage-first responder who reads bodies and morale under pressure.",
+              "body": "Speak as the medic. Think in triage, risk of collapse, hidden symptoms, and what keeps people functional for one more scene.",
+              "tags": [
+                "npc",
+                "medic"
+              ],
+              "variables": [],
+              "origin": "artifact",
+              "artifactRef": "jdr_solo_session_starter"
+            },
+            {
+              "id": "strip_npc_engineer_persona",
+              "name": "Speak as the engineer",
+              "description": "Systems-minded fixer who sees failure chains and workarounds.",
+              "body": "Speak as the engineer. Read every situation as systems under strain: tolerances, failure points, bypasses, and what can still be salvaged.",
+              "tags": [
+                "npc",
+                "engineer"
+              ],
+              "variables": [],
+              "origin": "artifact",
+              "artifactRef": "jdr_solo_session_starter"
+            },
+            {
+              "id": "strip_npc_marshal_persona",
+              "name": "Speak as the marshal",
+              "description": "Field commander balancing order, law, and escalation control.",
+              "body": "Speak as the marshal. Focus on containment, chain of command, lawful pressure, and how quickly disorder can spread when people improvise badly.",
+              "tags": [
+                "npc",
+                "marshal"
+              ],
+              "variables": [],
+              "origin": "artifact",
+              "artifactRef": "jdr_solo_session_starter"
+            }
+          ],
+          "promptAssignments": [
+            {
+              "id": "party_response_medic",
+              "stripId": "strip_npc_medic_persona",
+              "targetKind": "subagent",
+              "mergeMode": "replace_if_empty",
+              "order": 0,
+              "enabled": true,
+              "groupName": "response_team",
+              "agentName": "medic"
+            },
+            {
+              "id": "party_response_engineer",
+              "stripId": "strip_npc_engineer_persona",
+              "targetKind": "subagent",
+              "mergeMode": "replace_if_empty",
+              "order": 0,
+              "enabled": true,
+              "groupName": "response_team",
+              "agentName": "engineer"
+            },
+            {
+              "id": "party_response_marshal",
+              "stripId": "strip_npc_marshal_persona",
+              "targetKind": "subagent",
+              "mergeMode": "replace_if_empty",
+              "order": 0,
+              "enabled": true,
+              "groupName": "response_team",
+              "agentName": "marshal"
+            }
+          ],
+          "subagentGroups": [
+            {
+              "name": "response_team",
+              "agents": [
+                {
+                  "name": "medic",
+                  "description": "Keeps people functional when the scene turns clinical and urgent.",
+                  "systemPrompt": "Be the medic: calm, triage-driven, and precise about risk to bodies and morale.",
+                  "tools": []
+                },
+                {
+                  "name": "engineer",
+                  "description": "Stabilizes failing systems and improvises workable patches.",
+                  "systemPrompt": "Be the engineer: systems-minded, concise, and focused on bypasses, tolerances, and consequences.",
+                  "tools": []
+                },
+                {
+                  "name": "marshal",
+                  "description": "Coordinates lawful force, perimeter control, and escalation discipline.",
+                  "systemPrompt": "Be the marshal: procedural, protective, and alert to how fast disorder can spread.",
+                  "tools": []
+                }
+              ]
+            }
+          ],
+          "starterArtifacts": [
+            {
+              "artifactId": "jdr_solo_session_starter",
+              "artifactKind": "graph",
+              "label": "Open session starter",
+              "description": "Bounded LangGraph session starter."
+            }
+          ],
+          "runtimeContext": [
+            {
+              "key": "current_scene",
+              "value": "breach_alarm"
+            }
+          ]
+        },
+        {
+          "id": "module_jdr_utility_faction_clock_brief",
+          "name": "Faction clock brief",
+          "description": "Background aid for escalating faction responses and consequences.",
+          "category": "utility",
+          "tags": [
+            "jdr",
+            "utility",
+            "faction",
+            "clock"
+          ],
+          "lineage": "branch_overlay",
+          "branchTargets": [
+            "jdr_demo"
+          ],
+          "recommendedProfile": "tabletop_demo",
+          "themeHints": [
+            "tabletop",
+            "pressure"
+          ],
+          "compatibilityNotes": "Seeded for the JDR demo branch.",
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter",
+          "promptStrips": [
+            {
+              "id": "strip_utility_faction_clock_brief",
+              "name": "Faction pressure brief",
+              "description": "Keep faction responses legible and escalating.",
+              "body": "Track faction pressure in the background. When the table creates noise, leverage, or visible disruption, decide which faction notices, what clock advances, and what new pressure enters the scene.",
+              "tags": [
+                "utility",
+                "faction",
+                "clock"
+              ],
+              "variables": [],
+              "origin": "artifact",
+              "artifactRef": "jdr_solo_session_starter"
+            }
+          ],
+          "promptAssignments": [
+            {
+              "id": "utility_graph_faction_clock_brief",
+              "stripId": "strip_utility_faction_clock_brief",
+              "targetKind": "graph",
+              "mergeMode": "append",
+              "order": 20,
+              "enabled": true
+            }
+          ],
+          "subagentGroups": [],
+          "starterArtifacts": [
+            {
+              "artifactId": "jdr_solo_session_starter",
+              "artifactKind": "graph",
+              "label": "Open session starter",
+              "description": "Bounded LangGraph session starter."
+            }
+          ],
+          "runtimeContext": [
+            {
+              "key": "faction_brief",
+              "value": "enabled"
+            }
+          ]
+        },
+        {
+          "id": "module_jdr_utility_scene_zero_guardrails",
+          "name": "Scene zero guardrails",
+          "description": "Compact guardrails module for expectations, boundaries, and calibration.",
+          "category": "utility",
+          "tags": [
+            "jdr",
+            "utility",
+            "scene-zero",
+            "guardrails"
+          ],
+          "lineage": "branch_overlay",
+          "branchTargets": [
+            "jdr_demo"
+          ],
+          "recommendedProfile": "tabletop_demo",
+          "themeHints": [
+            "tabletop",
+            "safety"
+          ],
+          "compatibilityNotes": "Seeded for the JDR demo branch.",
+          "origin": "artifact",
+          "artifactRef": "jdr_solo_session_starter",
+          "promptStrips": [
+            {
+              "id": "strip_utility_scene_zero_guardrails",
+              "name": "Scene zero guardrails",
+              "description": "Keep expectations, boundaries, and campaign assumptions explicit.",
+              "body": "Before or between scenes, summarize boundaries, campaign assumptions, and the current social contract in compact terms. Surface tone drift early and keep the table aligned on expectations.",
+              "tags": [
+                "utility",
+                "scene_zero",
+                "guardrails"
+              ],
+              "variables": [],
+              "origin": "artifact",
+              "artifactRef": "jdr_solo_session_starter"
+            }
+          ],
+          "promptAssignments": [
+            {
+              "id": "utility_graph_scene_zero_guardrails",
+              "stripId": "strip_utility_scene_zero_guardrails",
+              "targetKind": "graph",
+              "mergeMode": "append",
+              "order": 30,
+              "enabled": true
+            }
+          ],
+          "subagentGroups": [],
+          "starterArtifacts": [
+            {
+              "artifactId": "jdr_solo_session_starter",
+              "artifactKind": "graph",
+              "label": "Open session starter",
+              "description": "Bounded LangGraph session starter."
+            }
+          ],
+          "runtimeContext": [
+            {
+              "key": "scene_zero_guardrails",
+              "value": "available"
+            }
+          ]
+        }
+      ],
+      "loadedModuleIds": [
+        "module_jdr_world_frontier_fantasy",
+        "module_jdr_rules_light_narrative",
+        "module_jdr_persona_gm_fair_guide",
+        "module_jdr_tone_adventure_with_consequence",
+        "module_jdr_party_roadside_cast",
+        "module_jdr_utility_structured_referee"
+      ],
+      "runtimeContext": [
+        {
+          "key": "session_kind",
+          "value": "solo_jdr"
+        },
+        {
+          "key": "setting_id",
+          "value": "frontier_fantasy"
+        },
+        {
+          "key": "rules_mode",
+          "value": "light_narrative"
+        },
+        {
+          "key": "opening_location",
+          "value": "roadside_inn"
+        },
+        {
+          "key": "current_scene",
+          "value": "opening_arrival"
+        },
+        {
+          "key": "tone_mode",
+          "value": "adventurous_grounded"
+        },
+        {
+          "key": "rules_helper",
+          "value": "structured_referee"
+        }
+      ]
+    }
+  }
+}

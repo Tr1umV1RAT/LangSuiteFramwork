@@ -19,7 +19,7 @@ initialize_log_file
 args=()
 [[ $CLEAN_NPM_CACHE -eq 1 ]] && args+=(--clean-npm-cache)
 [[ $DRY_RUN -eq 1 ]] && args+=(--dry-run)
-"$PROJECT_ROOT/qa/linux/HardReset-LangSuite.sh" "${args[@]}"
+bash "$PROJECT_ROOT/qa/linux/HardReset-LangSuite.sh" "${args[@]}"
 remove_if_exists "$VENV_DIR"
 remove_if_exists "$CLIENT_NODE_MODULES"
 if [[ $REMOVE_SHORTCUTS -eq 1 ]]; then

@@ -25,6 +25,12 @@ import { describeConnectionReason, describeSemanticKind, validateConnectionAffor
 import { deriveExecutionTimeline } from './executionTimeline';
 import { fetchArtifactManifest } from './api/artifacts';
 import { hydrateArtifactEditorGraph } from './store/artifactHydration';
+import TabletopStarterDialog from './components/TabletopStarterDialog';
+import { buildGuidedTabletopStarter, isTabletopRuntimeConfigNeeded, type TabletopStarterSelection } from './store/tabletopStarter';
+import { getTabletopVisualProfile } from './jdr/theme';
+import type { RuntimeSettings } from './store/types';
+import TabletopModuleBrowser from './components/TabletopModuleBrowser';
+import ObsidianGraphPanel from './components/ObsidianGraphPanel';
 
 const nodeTypes = { custom: CustomNode };
 
@@ -33,11 +39,13 @@ export default function App() {
     nodes,
     edges,
     tabs,
+    activeTabId,
     onNodesChange,
     onEdgesChange,
     onConnect: connectEdge,
     addNode,
     openTab,
+    applyWorkspacePreset,
     preferences,
     selectNodesByIds,
     setCapabilityInspectorTarget,
@@ -59,6 +67,14 @@ export default function App() {
   const runLogs = useAppStore((s) => s.runLogs);
   const runtimeHoverTarget = useAppStore((s) => s.runtimeHoverTarget);
   const runtimeNavigationSettings = useAppStore((s) => s.runtimeNavigationSettings);
+  const [tabletopDialogOpen, setTabletopDialogOpen] = useState(false);
+  const [tabletopModuleBrowserOpen, setTabletopModuleBrowserOpen] = useState(false);
+  const [obsidianGraphOpen, setObsidianGraphOpen] = useState(false);
+  const [tabletopStarterRuntimeSettings, setTabletopStarterRuntimeSettings] = useState<Partial<RuntimeSettings> | null>(null);
+
+  const activeTab = useMemo(() => tabs.find((tab) => tab.id === activeTabId) || null, [tabs, activeTabId]);
+  const tabletopVisualProfile = useMemo(() => getTabletopVisualProfile(activeTab?.runtimeSettings), [activeTab?.runtimeSettings]);
+  const tabletopRuntimeNeedsConfig = useMemo(() => tabletopVisualProfile.isTabletop && isTabletopRuntimeConfigNeeded(nodes as Node[]), [tabletopVisualProfile.isTabletop, nodes]);
 
   const executionTimeline = useMemo(() => deriveExecutionTimeline(edges, runLogs, { isRunning, isPaused, pendingNodeId, scheduledNodeIds: liveStateNext }), [edges, runLogs, isRunning, isPaused, pendingNodeId, liveStateNext]);
   const hoveredNodeId = runtimeHoverTarget?.nodeId || null;
@@ -245,8 +261,45 @@ export default function App() {
   }, [runtimeNavigationSettings.lockHover, clearRuntimeHoverTarget, updateRuntimeNavigationSettings]);
 
 
-  const openBuiltinStarter = useCallback(async (artifactId: string) => {
+  useEffect(() => {
+    const handler = () => setTabletopDialogOpen(true);
+    window.addEventListener('langsuite:open-tabletop-starter', handler as EventListener);
+    return () => window.removeEventListener('langsuite:open-tabletop-starter', handler as EventListener);
+  }, []);
+
+  useEffect(() => {
+    const handler = () => setTabletopModuleBrowserOpen(true);
+    window.addEventListener('langsuite:open-tabletop-modules', handler as EventListener);
+    return () => window.removeEventListener('langsuite:open-tabletop-modules', handler as EventListener);
+  }, []);
+
+  useEffect(() => {
+    const handler = () => setObsidianGraphOpen(true);
+    window.addEventListener('langsuite:open-obsidian-graph', handler as EventListener);
+    return () => window.removeEventListener('langsuite:open-obsidian-graph', handler as EventListener);
+  }, []);
+
+  useEffect(() => {
+    if (!tabletopDialogOpen) return;
+    let cancelled = false;
+    const loadTabletopCatalog = async () => {
+      try {
+        const manifest = await fetchArtifactManifest('graph', 'jdr_solo_session_starter');
+        if (cancelled) return;
+        setTabletopStarterRuntimeSettings(manifest.artifact.runtimeSettings || {});
+      } catch (err) {
+        console.error('Failed to preload tabletop module catalog', err);
+      }
+    };
+    void loadTabletopCatalog();
+    return () => {
+      cancelled = true;
+    };
+  }, [tabletopDialogOpen]);
+
+  const openBuiltinStarter = useCallback(async (artifactId: string, options: { preset?: 'tabletop_demo' } = {}) => {
     try {
+      if (options.preset) applyWorkspacePreset(options.preset);
       const manifest = await fetchArtifactManifest('graph', artifactId);
       const hydrated = hydrateArtifactEditorGraph(manifest.artifact);
       openTab(null, manifest.artifact.name || manifest.title, (hydrated.nodes as never[]) || [], (hydrated.edges as never[]) || [], manifest.artifact.customStateSchema || [], manifest.artifact.isAsync ?? true, {
@@ -257,10 +310,32 @@ export default function App() {
         projectMode: (manifest.artifact.projectMode || 'langgraph') as never,
         scopeKind: (manifest.artifact.artifactType || manifest.kind) === 'subgraph' ? 'subgraph' : 'project',
       });
+      if (artifactId === 'jdr_solo_session_starter' || options.preset === 'tabletop_demo') setTabletopModuleBrowserOpen(true);
     } catch (err) {
       console.error('Failed to open builtin starter', err);
     }
-  }, [openTab]);
+  }, [applyWorkspacePreset, openTab]);
+
+  const openGuidedTabletopStarter = useCallback(async (selection: TabletopStarterSelection) => {
+    try {
+      applyWorkspacePreset('tabletop_demo');
+      const manifest = await fetchArtifactManifest('graph', 'jdr_solo_session_starter');
+      const hydrated = hydrateArtifactEditorGraph(manifest.artifact);
+      const guided = buildGuidedTabletopStarter(manifest.artifact, (hydrated.nodes as Node[]) || [], (hydrated.edges as Edge[]) || [], selection);
+      openTab(null, guided.name, (guided.nodes as never[]) || [], (guided.edges as never[]) || [], manifest.artifact.customStateSchema || [], manifest.artifact.isAsync ?? true, {
+        graphBindings: manifest.artifact.graphBindings || [],
+        artifactType: (manifest.artifact.artifactType || manifest.kind) as never,
+        executionProfile: (manifest.artifact.executionProfile || 'langgraph_async') as never,
+        runtimeSettings: guided.runtimeSettings as never,
+        projectMode: (manifest.artifact.projectMode || 'langgraph') as never,
+        scopeKind: (manifest.artifact.artifactType || manifest.kind) === 'subgraph' ? 'subgraph' : 'project',
+      });
+      setTabletopDialogOpen(false);
+      setTabletopModuleBrowserOpen(true);
+    } catch (err) {
+      console.error('Failed to open guided tabletop starter', err);
+    }
+  }, [applyWorkspacePreset, openTab]);
 
   const onDrop = useCallback(
     (e: DragEvent) => {
@@ -281,7 +356,7 @@ export default function App() {
   );
 
   return (
-    <div className={`w-full h-full flex flex-col bg-canvas density-${preferences.uiDensity}`}>
+    <div className={`w-full h-full flex flex-col bg-canvas density-${preferences.uiDensity} ${tabletopVisualProfile.shellClassName}`.trim()}>
       <Toolbar />
       <TabBar />
       <div className="flex-1 relative overflow-hidden">
@@ -479,6 +554,40 @@ export default function App() {
           </div>
         )}
 
+        {tabletopVisualProfile.isTabletop && !isEmptyCanvas && (
+          <div className="absolute right-3 top-3 z-20" data-testid="tabletop-shell-badge">
+            <div className="rounded-2xl border border-fuchsia-500/20 bg-[#111522]/88 px-3 py-2 shadow-2xl shadow-black/30 backdrop-blur-md">
+              <div className="text-[10px] uppercase tracking-[0.22em] text-fuchsia-200/90">{tabletopVisualProfile.badgeLabel}</div>
+              <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+                {tabletopVisualProfile.settingLabel && <span className="rounded-full border border-panel-border bg-black/20 px-2 py-1 text-slate-200">{tabletopVisualProfile.settingLabel}</span>}
+                {tabletopVisualProfile.rulesLabel && <span className="rounded-full border border-panel-border bg-black/20 px-2 py-1 text-slate-300">{tabletopVisualProfile.rulesLabel}</span>}
+                {tabletopVisualProfile.toneLabel && <span className="rounded-full border border-panel-border bg-black/20 px-2 py-1 text-slate-300">{tabletopVisualProfile.toneLabel}</span>}
+                {tabletopRuntimeNeedsConfig && <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-amber-200">Runtime setup needed</span>}
+                {!tabletopRuntimeNeedsConfig && <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-emerald-200">Check runtime on Run</span>}
+              </div>
+              <div className="mt-2 text-[11px] leading-5 text-slate-400">
+                {tabletopRuntimeNeedsConfig
+                  ? 'This session is ready to edit. Choose provider/model later from the graph or Run panel.'
+                  : 'Provider-backed nodes are configured. Run preflight still decides whether execution is allowed.'}
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  onClick={() => setTabletopModuleBrowserOpen(true)}
+                  className="rounded-lg border border-fuchsia-500/20 bg-fuchsia-500/10 px-2.5 py-1.5 text-[10px] font-medium text-fuchsia-100 hover:bg-fuchsia-500/20 transition-all"
+                >
+                  Modules
+                </button>
+                <button
+                  onClick={() => setObsidianGraphOpen(true)}
+                  className="rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-2.5 py-1.5 text-[10px] font-medium text-cyan-100 hover:bg-cyan-500/20 transition-all"
+                >
+                  Obsidian graph
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {isEmptyCanvas && (
           <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none px-6">
             <div className="pointer-events-auto w-full max-w-xl rounded-2xl border border-panel-border bg-[#111522]/85 backdrop-blur-md shadow-2xl shadow-black/30 p-5 md:p-6">
@@ -522,6 +631,21 @@ export default function App() {
                 >
                   Open static debug starter
                 </button>
+                <button
+                  onClick={() => setTabletopDialogOpen(true)}
+                  className="rounded-lg border border-fuchsia-500/20 bg-fuchsia-500/10 px-3 py-2 text-[11px] font-medium text-fuchsia-100 hover:bg-fuchsia-500/20 transition-all"
+                >
+                  Build guided session
+                </button>
+                <button
+                  onClick={() => void openBuiltinStarter('jdr_solo_session_starter', { preset: 'tabletop_demo' })}
+                  className="rounded-lg border border-violet-500/20 bg-violet-500/10 px-3 py-2 text-[11px] font-medium text-violet-100 hover:bg-violet-500/20 transition-all"
+                >
+                  Open tabletop starter
+                </button>
+              </div>
+              <div className="mt-2 text-[11px] text-slate-500">
+                Guided setup assembles bounded packs and opens a normal editable graph. Runtime setup stays deferred until Run. The direct starter opens the same JDR scaffold with GM, cast, prompt strips, dice, and a rules helper.
               </div>
 
               <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -558,6 +682,27 @@ export default function App() {
           </div>
         )}
 
+        <TabletopStarterDialog
+          open={tabletopDialogOpen}
+          onClose={() => setTabletopDialogOpen(false)}
+          onLaunch={openGuidedTabletopStarter}
+          runtimeSettings={tabletopStarterRuntimeSettings}
+        />
+        <TabletopModuleBrowser
+          open={tabletopModuleBrowserOpen}
+          onClose={() => setTabletopModuleBrowserOpen(false)}
+          onOpenStarter={(artifactKind, artifactId) => {
+            if (artifactKind === 'graph') {
+              void openBuiltinStarter(artifactId, { preset: 'tabletop_demo' });
+            }
+          }}
+        />
+        <ObsidianGraphPanel
+          open={obsidianGraphOpen}
+          onClose={() => setObsidianGraphOpen(false)}
+          runtimeSettings={activeTab?.runtimeSettings || null}
+          graphName={activeTab?.projectName || 'Tabletop Session'}
+        />
         <RunPanel />
         <CollabPanel />
         <SidePanelSystem />

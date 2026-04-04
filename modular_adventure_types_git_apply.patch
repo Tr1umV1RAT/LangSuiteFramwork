@@ -1,0 +1,1130 @@
+diff --git a/client/src/store/types.ts b/client/src/store/types.ts
+index 98faacd..131d97a 100644
+--- a/client/src/store/types.ts
++++ b/client/src/store/types.ts
+@@ -80,8 +80,16 @@ export interface PromptStripAssignment {
+   enabled: boolean;
+ }
+ 
+-export type ModuleLibraryCategory = 'world' | 'rules' | 'persona' | 'party' | 'utility' | 'mixed';
++export type ModuleLibraryCategory = 'world' | 'rules' | 'persona' | 'party' | 'utility' | 'adventure' | 'mixed';
+ export type ModuleLibraryLineage = 'shared' | 'branch_overlay';
++export type ModuleSeedMergePolicy = 'error' | 'preserve' | 'replace';
++export type SceneSeedKind = 'opening' | 'travel' | 'social' | 'investigation' | 'combat' | 'fallback';
++export type EncounterSeedKind = 'social_pressure' | 'combat_pressure' | 'hazard' | 'investigation' | 'pursuit';
++export type LocationSeedKind = 'inn' | 'district' | 'station' | 'ruin' | 'wilderness' | 'settlement' | 'site';
++export type SeedStatus = 'seeded' | 'active' | 'resolved';
++export type ModuleSlotName = 'opening_scene' | 'default_location' | 'starter_encounter' | 'starter_clock' | 'primary_cast' | 'fallback_referee_frame';
++export type ModuleSlotEntityType = 'scene' | 'encounter' | 'location' | 'clock' | 'cast_group';
++export type ModuleSlotPolicy = 'exclusive' | 'append' | 'replace';
+ 
+ export interface ModulePromptAssignmentPreset {
+   id: string;
+@@ -101,6 +109,79 @@ export interface ModuleStarterArtifactRef {
+   description?: string;
+ }
+ 
++export interface SubagentRef {
++  groupName: string;
++  agentName: string;
++}
++
++export interface StructuredSeedBase {
++  id: string;
++  title: string;
++  description?: string;
++  tags: string[];
++  mergePolicy: ModuleSeedMergePolicy;
++  origin: 'workspace' | 'artifact';
++  artifactRef?: string | null;
++  sourceModuleId?: string;
++}
++
++export interface SceneSeed extends StructuredSeedBase {
++  kind: SceneSeedKind;
++  status: SeedStatus;
++  locationId?: string;
++  objective?: string;
++  situation?: string;
++  castGroupNames: string[];
++  encounterIds: string[];
++  clockIds: string[];
++}
++
++export interface EncounterSeed extends StructuredSeedBase {
++  kind: EncounterSeedKind;
++  status: SeedStatus;
++  sceneId?: string;
++  locationId?: string;
++  participantRefs: SubagentRef[];
++  pressure: 'low' | 'medium' | 'high';
++  stakes?: string;
++  successAtCost?: string;
++  falloutOnFail?: string;
++  suggestedToolIds: string[];
++}
++
++export interface LocationSeed extends StructuredSeedBase {
++  kind: LocationSeedKind;
++  status: SeedStatus;
++  summary?: string;
++  region?: string;
++  parentLocationId?: string;
++  sceneIds: string[];
++}
++
++export interface ClockSeed extends StructuredSeedBase {
++  status: SeedStatus;
++  segments: number;
++  progress: number;
++  trigger?: string;
++  consequence?: string;
++  sceneId?: string;
++  locationId?: string;
++}
++
++export interface ModuleSlotProvision {
++  slot: ModuleSlotName;
++  entityType: ModuleSlotEntityType;
++  entityId: string;
++  policy: ModuleSlotPolicy;
++}
++
++export interface RuntimeSlotBinding {
++  slot: ModuleSlotName;
++  entityType: ModuleSlotEntityType;
++  entityId: string;
++  providerModuleId: string;
++}
++
+ export interface ModuleLibraryEntry {
+   id: string;
+   name: string;
+@@ -119,6 +200,14 @@ export interface ModuleLibraryEntry {
+   subagentGroups: SubagentGroupDefinition[];
+   starterArtifacts: ModuleStarterArtifactRef[];
+   runtimeContext: { key: string; value: string }[];
++  moduleDependencies: string[];
++  moduleConflicts: string[];
++  requiresSlots: ModuleSlotName[];
++  providesSlots: ModuleSlotProvision[];
++  sceneSeeds: SceneSeed[];
++  encounterSeeds: EncounterSeed[];
++  locationSeeds: LocationSeed[];
++  clockSeeds: ClockSeed[];
+ }
+ 
+ export interface RuntimeSettings {
+@@ -136,6 +225,11 @@ export interface RuntimeSettings {
+   loadedModuleIds: string[];
+   runtimeContext: { key: string; value: string }[];
+   shellExecutionEnabled: boolean;
++  sceneSeeds: SceneSeed[];
++  encounterSeeds: EncounterSeed[];
++  locationSeeds: LocationSeed[];
++  clockSeeds: ClockSeed[];
++  slotBindings: RuntimeSlotBinding[];
+ }
+ 
+ export interface GraphValidationIssue {
+diff --git a/client/src/store/workspace.ts b/client/src/store/workspace.ts
+index 149ad71..2569ce1 100644
+--- a/client/src/store/workspace.ts
++++ b/client/src/store/workspace.ts
+@@ -15,7 +15,7 @@ import {
+   projectModeAllowsCompile,
+   projectModeAllowsRuntime,
+ } from '../capabilities';
+-import type { GraphBinding, ImportDiagnostic, ModuleLibraryCategory, ModuleLibraryEntry, ModuleLibraryLineage, ModulePromptAssignmentPreset, ModuleStarterArtifactRef, PromptAssignmentTarget, PromptStripAssignment, PromptStripDefinition, PromptStripMergeMode, PromptStripVariableDefinition, RuntimeSettings, SerializedWorkspaceTab, SurfaceTruthSummary, Tab, WorkspaceTreeSnapshot, SubagentDefinition, SubagentGroupDefinition } from './types';
++import type { GraphBinding, ImportDiagnostic, ModuleLibraryCategory, ModuleLibraryEntry, ModuleLibraryLineage, ModulePromptAssignmentPreset, ModuleStarterArtifactRef, PromptAssignmentTarget, PromptStripAssignment, PromptStripDefinition, PromptStripMergeMode, PromptStripVariableDefinition, RuntimeSettings, SerializedWorkspaceTab, SurfaceTruthSummary, Tab, WorkspaceTreeSnapshot, SubagentDefinition, SubagentGroupDefinition, SceneSeed, EncounterSeed, LocationSeed, ClockSeed, ModuleSlotProvision, RuntimeSlotBinding, ModuleSlotName, ModuleSlotEntityType, ModuleSlotPolicy, ModuleSeedMergePolicy, SubagentRef } from './types';
+ 
+ export { normalizeVisibleArtifactType, normalizeVisibleExecutionProfile, normalizeWorkspaceArtifactType, normalizeWorkspaceExecutionProfile };
+ 
+@@ -147,8 +147,276 @@ function sanitizeRuntimeContextEntries(raw: unknown): { key: string; value: stri
+     : [];
+ }
+ 
++const MODULE_SLOT_NAME_RE = /^(opening_scene|default_location|starter_encounter|starter_clock|primary_cast|fallback_referee_frame)$/;
++const MODULE_IDENTIFIER_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
++
++function sanitizeStringList(raw: unknown, pattern?: RegExp): string[] {
++  if (!Array.isArray(raw)) return [];
++  const seen = new Set<string>();
++  const cleaned: string[] = [];
++  raw.forEach((item) => {
++    const value = typeof item === 'string' ? item.trim() : '';
++    if (!value) return;
++    if (pattern && !pattern.test(value)) return;
++    if (seen.has(value)) return;
++    seen.add(value);
++    cleaned.push(value);
++  });
++  return cleaned;
++}
++
++function sanitizeSeedMergePolicy(raw: unknown): ModuleSeedMergePolicy {
++  return raw === 'preserve' || raw === 'replace' ? raw : 'error';
++}
++
++function sanitizeSeedStatus(raw: unknown): 'seeded' | 'active' | 'resolved' {
++  return raw === 'active' || raw === 'resolved' ? raw : 'seeded';
++}
++
++function sanitizeModuleSlotName(raw: unknown): ModuleSlotName | null {
++  return typeof raw === 'string' && MODULE_SLOT_NAME_RE.test(raw.trim()) ? raw.trim() as ModuleSlotName : null;
++}
++
++function sanitizeModuleSlotEntityType(raw: unknown): ModuleSlotEntityType | null {
++  const value = typeof raw === 'string' ? raw.trim() : '';
++  return value === 'scene' || value === 'encounter' || value === 'location' || value === 'clock' || value === 'cast_group' ? value : null;
++}
++
++function sanitizeModuleSlotPolicy(raw: unknown): ModuleSlotPolicy {
++  return raw === 'append' || raw === 'replace' ? raw : 'exclusive';
++}
++
++function sanitizeSubagentRef(raw: unknown): SubagentRef | null {
++  if (!raw || typeof raw !== 'object') return null;
++  const data = raw as Record<string, unknown>;
++  const groupName = typeof data.groupName === 'string' ? data.groupName.trim() : '';
++  const agentName = typeof data.agentName === 'string' ? data.agentName.trim() : '';
++  if (!MODULE_IDENTIFIER_RE.test(groupName) || !MODULE_IDENTIFIER_RE.test(agentName)) return null;
++  return { groupName, agentName };
++}
++
++function sanitizeStructuredSeedBase<T extends {
++  id: string;
++  title: string;
++  description?: string;
++  tags?: string[];
++  mergePolicy?: ModuleSeedMergePolicy;
++  origin?: 'workspace' | 'artifact';
++  artifactRef?: string | null;
++  sourceModuleId?: string;
++}>(
++  data: Record<string, unknown>,
++  fallbackId: string,
++  fallbackTitle: string,
++) {
++  const id = typeof data.id === 'string' && MODULE_IDENTIFIER_RE.test(data.id.trim()) ? data.id.trim() : fallbackId;
++  const title = typeof data.title === 'string' && data.title.trim() ? data.title.trim() : fallbackTitle;
++  const sourceModuleId = typeof data.sourceModuleId === 'string' && MODULE_IDENTIFIER_RE.test(data.sourceModuleId.trim())
++    ? data.sourceModuleId.trim()
++    : undefined;
++  return {
++    id,
++    title,
++    description: typeof data.description === 'string' ? data.description : '',
++    tags: sanitizeStringList(data.tags),
++    mergePolicy: sanitizeSeedMergePolicy(data.mergePolicy),
++    origin: data.origin === 'artifact' ? 'artifact' as const : 'workspace' as const,
++    artifactRef: typeof data.artifactRef === 'string' && data.artifactRef.trim() ? data.artifactRef.trim() : null,
++    sourceModuleId,
++  };
++}
++
++function sanitizeSceneSeed(raw: unknown, index: number): SceneSeed | null {
++  if (!raw || typeof raw !== 'object') return null;
++  const data = raw as Record<string, unknown>;
++  const base = sanitizeStructuredSeedBase(data, `scene_${index + 1}`, `Scene ${index + 1}`);
++  const kind = data.kind === 'travel' || data.kind === 'social' || data.kind === 'investigation' || data.kind === 'combat' || data.kind === 'fallback' ? data.kind : 'opening';
++  const locationId = typeof data.locationId === 'string' && MODULE_IDENTIFIER_RE.test(data.locationId.trim()) ? data.locationId.trim() : undefined;
++  return {
++    ...base,
++    kind,
++    status: sanitizeSeedStatus(data.status),
++    locationId,
++    objective: typeof data.objective === 'string' ? data.objective : '',
++    situation: typeof data.situation === 'string' ? data.situation : '',
++    castGroupNames: sanitizeStringList(data.castGroupNames, MODULE_IDENTIFIER_RE),
++    encounterIds: sanitizeStringList(data.encounterIds, MODULE_IDENTIFIER_RE),
++    clockIds: sanitizeStringList(data.clockIds, MODULE_IDENTIFIER_RE),
++  };
++}
++
++function sanitizeEncounterSeed(raw: unknown, index: number): EncounterSeed | null {
++  if (!raw || typeof raw !== 'object') return null;
++  const data = raw as Record<string, unknown>;
++  const base = sanitizeStructuredSeedBase(data, `encounter_${index + 1}`, `Encounter ${index + 1}`);
++  const kind = data.kind === 'combat_pressure' || data.kind === 'hazard' || data.kind === 'investigation' || data.kind === 'pursuit' ? data.kind : 'social_pressure';
++  const sceneId = typeof data.sceneId === 'string' && MODULE_IDENTIFIER_RE.test(data.sceneId.trim()) ? data.sceneId.trim() : undefined;
++  const locationId = typeof data.locationId === 'string' && MODULE_IDENTIFIER_RE.test(data.locationId.trim()) ? data.locationId.trim() : undefined;
++  const participantRefs = Array.isArray(data.participantRefs)
++    ? data.participantRefs.map((item) => sanitizeSubagentRef(item)).filter((item): item is SubagentRef => Boolean(item))
++    : [];
++  return {
++    ...base,
++    kind,
++    status: sanitizeSeedStatus(data.status),
++    sceneId,
++    locationId,
++    participantRefs,
++    pressure: data.pressure === 'low' || data.pressure === 'high' ? data.pressure : 'medium',
++    stakes: typeof data.stakes === 'string' ? data.stakes : '',
++    successAtCost: typeof data.successAtCost === 'string' ? data.successAtCost : '',
++    falloutOnFail: typeof data.falloutOnFail === 'string' ? data.falloutOnFail : '',
++    suggestedToolIds: sanitizeStringList(data.suggestedToolIds, MODULE_IDENTIFIER_RE),
++  };
++}
++
++function sanitizeLocationSeed(raw: unknown, index: number): LocationSeed | null {
++  if (!raw || typeof raw !== 'object') return null;
++  const data = raw as Record<string, unknown>;
++  const base = sanitizeStructuredSeedBase(data, `location_${index + 1}`, `Location ${index + 1}`);
++  const kind = data.kind === 'inn' || data.kind === 'district' || data.kind === 'station' || data.kind === 'ruin' || data.kind === 'wilderness' || data.kind === 'settlement' ? data.kind : 'site';
++  const parentLocationId = typeof data.parentLocationId === 'string' && MODULE_IDENTIFIER_RE.test(data.parentLocationId.trim()) ? data.parentLocationId.trim() : undefined;
++  return {
++    ...base,
++    kind,
++    status: sanitizeSeedStatus(data.status),
++    summary: typeof data.summary === 'string' ? data.summary : '',
++    region: typeof data.region === 'string' ? data.region : '',
++    parentLocationId,
++    sceneIds: sanitizeStringList(data.sceneIds, MODULE_IDENTIFIER_RE),
++  };
++}
++
++function sanitizeClockSeed(raw: unknown, index: number): ClockSeed | null {
++  if (!raw || typeof raw !== 'object') return null;
++  const data = raw as Record<string, unknown>;
++  const base = sanitizeStructuredSeedBase(data, `clock_${index + 1}`, `Clock ${index + 1}`);
++  const sceneId = typeof data.sceneId === 'string' && MODULE_IDENTIFIER_RE.test(data.sceneId.trim()) ? data.sceneId.trim() : undefined;
++  const locationId = typeof data.locationId === 'string' && MODULE_IDENTIFIER_RE.test(data.locationId.trim()) ? data.locationId.trim() : undefined;
++  const segments = Number.isFinite(Number(data.segments)) ? Math.max(1, Math.min(24, Number(data.segments))) : 4;
++  const progress = Number.isFinite(Number(data.progress)) ? Math.max(0, Math.min(segments, Number(data.progress))) : 0;
++  return {
++    ...base,
++    status: sanitizeSeedStatus(data.status),
++    segments,
++    progress,
++    trigger: typeof data.trigger === 'string' ? data.trigger : '',
++    consequence: typeof data.consequence === 'string' ? data.consequence : '',
++    sceneId,
++    locationId,
++  };
++}
++
++function sanitizeModuleSlotProvision(raw: unknown): ModuleSlotProvision | null {
++  if (!raw || typeof raw !== 'object') return null;
++  const data = raw as Record<string, unknown>;
++  const slot = sanitizeModuleSlotName(data.slot);
++  const entityType = sanitizeModuleSlotEntityType(data.entityType);
++  const entityId = typeof data.entityId === 'string' && MODULE_IDENTIFIER_RE.test(data.entityId.trim()) ? data.entityId.trim() : '';
++  if (!slot || !entityType || !entityId) return null;
++  return {
++    slot,
++    entityType,
++    entityId,
++    policy: sanitizeModuleSlotPolicy(data.policy),
++  };
++}
++
++function sanitizeRuntimeSlotBinding(raw: unknown): RuntimeSlotBinding | null {
++  if (!raw || typeof raw !== 'object') return null;
++  const data = raw as Record<string, unknown>;
++  const slot = sanitizeModuleSlotName(data.slot);
++  const entityType = sanitizeModuleSlotEntityType(data.entityType);
++  const entityId = typeof data.entityId === 'string' && MODULE_IDENTIFIER_RE.test(data.entityId.trim()) ? data.entityId.trim() : '';
++  const providerModuleId = typeof data.providerModuleId === 'string' && MODULE_IDENTIFIER_RE.test(data.providerModuleId.trim()) ? data.providerModuleId.trim() : '';
++  if (!slot || !entityType || !entityId || !providerModuleId) return null;
++  return { slot, entityType, entityId, providerModuleId };
++}
++
++function sanitizeSceneSeeds(raw: unknown): SceneSeed[] {
++  if (!Array.isArray(raw)) return [];
++  const seen = new Set<string>();
++  const items: SceneSeed[] = [];
++  raw.forEach((item, index) => {
++    const sanitized = sanitizeSceneSeed(item, index);
++    if (!sanitized || seen.has(sanitized.id)) return;
++    seen.add(sanitized.id);
++    items.push(sanitized);
++  });
++  return items;
++}
++
++function sanitizeEncounterSeeds(raw: unknown): EncounterSeed[] {
++  if (!Array.isArray(raw)) return [];
++  const seen = new Set<string>();
++  const items: EncounterSeed[] = [];
++  raw.forEach((item, index) => {
++    const sanitized = sanitizeEncounterSeed(item, index);
++    if (!sanitized || seen.has(sanitized.id)) return;
++    seen.add(sanitized.id);
++    items.push(sanitized);
++  });
++  return items;
++}
++
++function sanitizeLocationSeeds(raw: unknown): LocationSeed[] {
++  if (!Array.isArray(raw)) return [];
++  const seen = new Set<string>();
++  const items: LocationSeed[] = [];
++  raw.forEach((item, index) => {
++    const sanitized = sanitizeLocationSeed(item, index);
++    if (!sanitized || seen.has(sanitized.id)) return;
++    seen.add(sanitized.id);
++    items.push(sanitized);
++  });
++  return items;
++}
++
++function sanitizeClockSeeds(raw: unknown): ClockSeed[] {
++  if (!Array.isArray(raw)) return [];
++  const seen = new Set<string>();
++  const items: ClockSeed[] = [];
++  raw.forEach((item, index) => {
++    const sanitized = sanitizeClockSeed(item, index);
++    if (!sanitized || seen.has(sanitized.id)) return;
++    seen.add(sanitized.id);
++    items.push(sanitized);
++  });
++  return items;
++}
++
++function sanitizeModuleSlotProvisions(raw: unknown): ModuleSlotProvision[] {
++  if (!Array.isArray(raw)) return [];
++  const seen = new Set<string>();
++  const items: ModuleSlotProvision[] = [];
++  raw.forEach((item) => {
++    const sanitized = sanitizeModuleSlotProvision(item);
++    if (!sanitized) return;
++    const key = `${sanitized.slot}:${sanitized.entityType}:${sanitized.entityId}:${sanitized.policy}`;
++    if (seen.has(key)) return;
++    seen.add(key);
++    items.push(sanitized);
++  });
++  return items;
++}
++
++function sanitizeRuntimeSlotBindings(raw: unknown): RuntimeSlotBinding[] {
++  if (!Array.isArray(raw)) return [];
++  const seen = new Set<string>();
++  const items: RuntimeSlotBinding[] = [];
++  raw.forEach((item) => {
++    const sanitized = sanitizeRuntimeSlotBinding(item);
++    if (!sanitized) return;
++    const key = `${sanitized.slot}:${sanitized.entityType}:${sanitized.entityId}:${sanitized.providerModuleId}`;
++    if (seen.has(key)) return;
++    seen.add(key);
++    items.push(sanitized);
++  });
++  return items;
++}
++
+ function sanitizeModuleCategory(raw: unknown): ModuleLibraryCategory {
+-  return raw === 'world' || raw === 'rules' || raw === 'persona' || raw === 'party' || raw === 'utility' ? raw : 'mixed';
++  return raw === 'world' || raw === 'rules' || raw === 'persona' || raw === 'party' || raw === 'utility' || raw === 'adventure' ? raw : 'mixed';
+ }
+ 
+ function sanitizeModuleLineage(raw: unknown): ModuleLibraryLineage {
+@@ -251,6 +519,14 @@ function sanitizeModuleLibraryEntry(raw: unknown, index: number): ModuleLibraryE
+     subagentGroups: sanitizeSubagentLibrary(data.subagentGroups),
+     starterArtifacts: sanitizeModuleStarterArtifactRefs(data.starterArtifacts),
+     runtimeContext: sanitizeRuntimeContextEntries(data.runtimeContext),
++    moduleDependencies: sanitizeIdentifierList(data.moduleDependencies),
++    moduleConflicts: sanitizeIdentifierList(data.moduleConflicts),
++    requiresSlots: sanitizeStringList(data.requiresSlots, MODULE_SLOT_NAME_RE) as ModuleSlotName[],
++    providesSlots: sanitizeModuleSlotProvisions(data.providesSlots),
++    sceneSeeds: sanitizeSceneSeeds(data.sceneSeeds),
++    encounterSeeds: sanitizeEncounterSeeds(data.encounterSeeds),
++    locationSeeds: sanitizeLocationSeeds(data.locationSeeds),
++    clockSeeds: sanitizeClockSeeds(data.clockSeeds),
+   };
+ }
+ 
+@@ -501,6 +777,11 @@ export function defaultRuntimeSettings(projectMode: ProjectMode = 'langgraph'):
+     loadedModuleIds: [],
+     runtimeContext: [],
+     shellExecutionEnabled: false,
++    sceneSeeds: [],
++    encounterSeeds: [],
++    locationSeeds: [],
++    clockSeeds: [],
++    slotBindings: [],
+   };
+ }
+ 
+@@ -523,6 +804,11 @@ export function sanitizeRuntimeSettings(settings: Partial<RuntimeSettings> | nul
+     loadedModuleIds: sanitizeLoadedModuleIds(settings?.loadedModuleIds),
+     runtimeContext: sanitizeRuntimeContextEntries(settings?.runtimeContext),
+     shellExecutionEnabled: settings?.shellExecutionEnabled === true,
++    sceneSeeds: sanitizeSceneSeeds(settings?.sceneSeeds),
++    encounterSeeds: sanitizeEncounterSeeds(settings?.encounterSeeds),
++    locationSeeds: sanitizeLocationSeeds(settings?.locationSeeds),
++    clockSeeds: sanitizeClockSeeds(settings?.clockSeeds),
++    slotBindings: sanitizeRuntimeSlotBindings(settings?.slotBindings),
+   };
+ }
+ 
+@@ -555,6 +841,105 @@ function mergeRuntimeContextLists(base: { key: string; value: string }[], incomi
+   return [...base, ...incoming.filter((entry) => !seen.has(entry.key))];
+ }
+ 
++function getLoadedModuleEntries(settings: RuntimeSettings): ModuleLibraryEntry[] {
++  const ids = new Set(settings.loadedModuleIds || []);
++  return (settings.moduleLibrary || []).filter((entry) => ids.has(entry.id));
++}
++
++function assertModuleCanBeApplied(settings: RuntimeSettings, moduleEntry: ModuleLibraryEntry): void {
++  const loadedIds = new Set(settings.loadedModuleIds || []);
++  (moduleEntry.moduleDependencies || []).forEach((dependencyId) => {
++    if (!loadedIds.has(dependencyId)) {
++      throw new Error(`Module '${moduleEntry.id}' requires missing module '${dependencyId}'.`);
++    }
++  });
++  (moduleEntry.moduleConflicts || []).forEach((conflictId) => {
++    if (loadedIds.has(conflictId)) {
++      throw new Error(`Module '${moduleEntry.id}' conflicts with already loaded module '${conflictId}'.`);
++    }
++  });
++  getLoadedModuleEntries(settings).forEach((loadedModule) => {
++    if ((loadedModule.moduleConflicts || []).includes(moduleEntry.id)) {
++      throw new Error(`Loaded module '${loadedModule.id}' conflicts with module '${moduleEntry.id}'.`);
++    }
++  });
++}
++
++function attachSourceModuleId<T extends { sourceModuleId?: string }>(items: T[], moduleId: string): T[] {
++  return items.map((item) => ({ ...item, sourceModuleId: item.sourceModuleId || moduleId }));
++}
++
++function mergeSeedListsById<T extends { id: string; mergePolicy?: ModuleSeedMergePolicy }>(
++  base: T[],
++  incoming: T[],
++  label: string,
++  moduleId: string,
++): T[] {
++  const byId = new Map(base.map((item) => [item.id, item]));
++  incoming.forEach((item) => {
++    const existing = byId.get(item.id);
++    if (!existing) {
++      byId.set(item.id, item);
++      return;
++    }
++    if (JSON.stringify(existing) === JSON.stringify(item)) return;
++    const mergePolicy = item.mergePolicy || 'error';
++    if (mergePolicy === 'preserve') return;
++    if (mergePolicy === 'replace') {
++      byId.set(item.id, item);
++      return;
++    }
++    throw new Error(`Module '${moduleId}' attempted to redefine ${label} '${item.id}'.`);
++  });
++  return Array.from(byId.values());
++}
++
++function mergeSlotBindings(
++  base: RuntimeSlotBinding[],
++  incoming: ModuleSlotProvision[],
++  providerModuleId: string,
++): RuntimeSlotBinding[] {
++  let next = [...base];
++  incoming.forEach((provision) => {
++    const binding: RuntimeSlotBinding = {
++      slot: provision.slot,
++      entityType: provision.entityType,
++      entityId: provision.entityId,
++      providerModuleId,
++    };
++    if (provision.policy === 'replace') {
++      next = next.filter((existing) => existing.slot !== provision.slot);
++      next.push(binding);
++      return;
++    }
++    if (provision.policy === 'append') {
++      const duplicate = next.some((existing) => existing.slot === binding.slot && existing.entityType === binding.entityType && existing.entityId === binding.entityId && existing.providerModuleId === providerModuleId);
++      if (!duplicate) next.push(binding);
++      return;
++    }
++    const conflict = next.find((existing) => existing.slot === provision.slot && existing.providerModuleId !== providerModuleId);
++    if (conflict) {
++      throw new Error(`Module '${providerModuleId}' cannot claim exclusive slot '${provision.slot}' because it is already provided by '${conflict.providerModuleId}'.`);
++    }
++    next = next.filter((existing) => !(existing.slot === binding.slot && existing.providerModuleId === providerModuleId));
++    next.push(binding);
++  });
++  return next;
++}
++
++function assertRequiredSlotsResolved(
++  slotBindings: RuntimeSlotBinding[],
++  requiredSlots: ModuleSlotName[],
++  moduleId: string,
++): void {
++  const available = new Set(slotBindings.map((binding) => binding.slot));
++  requiredSlots.forEach((slot) => {
++    if (!available.has(slot)) {
++      throw new Error(`Module '${moduleId}' requires unresolved slot '${slot}'.`);
++    }
++  });
++}
++
+ function buildModulePresetRuntimeTarget(preset: ModulePromptAssignmentPreset, tabId: string): PromptAssignmentTarget | null {
+   if (preset.targetKind === 'graph') return { kind: 'graph', tabId };
+   if (preset.targetKind === 'subagent' && preset.groupName && preset.agentName) {
+@@ -632,16 +1017,37 @@ function mergePromptAssignmentsFromModule(base: PromptStripAssignment[], moduleE
+ }
+ 
+ export function applyModuleDefinitionToRuntimeSettings(settings: RuntimeSettings, moduleEntry: ModuleLibraryEntry, options: { tabId?: string | null } = {}): RuntimeSettings {
++  assertModuleCanBeApplied(settings, moduleEntry);
++
++  const incomingSceneSeeds = attachSourceModuleId(moduleEntry.sceneSeeds || [], moduleEntry.id);
++  const incomingEncounterSeeds = attachSourceModuleId(moduleEntry.encounterSeeds || [], moduleEntry.id);
++  const incomingLocationSeeds = attachSourceModuleId(moduleEntry.locationSeeds || [], moduleEntry.id);
++  const incomingClockSeeds = attachSourceModuleId(moduleEntry.clockSeeds || [], moduleEntry.id);
++
++  const nextSlotBindings = mergeSlotBindings(
++    settings.slotBindings || [],
++    moduleEntry.providesSlots || [],
++    moduleEntry.id,
++  );
++
++  assertRequiredSlotsResolved(nextSlotBindings, moduleEntry.requiresSlots || [], moduleEntry.id);
++
+   return sanitizeRuntimeSettings({
+     ...settings,
+     promptStripLibrary: mergePromptStripLibraries(settings.promptStripLibrary || [], moduleEntry.promptStrips || []),
+     promptStripAssignments: mergePromptAssignmentsFromModule(settings.promptStripAssignments || [], moduleEntry, options.tabId),
+     subagentLibrary: mergeSubagentLibraries(settings.subagentLibrary || [], moduleEntry.subagentGroups || []),
+     runtimeContext: mergeRuntimeContextLists(settings.runtimeContext || [], moduleEntry.runtimeContext || []),
++    sceneSeeds: mergeSeedListsById(settings.sceneSeeds || [], incomingSceneSeeds, 'sceneSeeds', moduleEntry.id),
++    encounterSeeds: mergeSeedListsById(settings.encounterSeeds || [], incomingEncounterSeeds, 'encounterSeeds', moduleEntry.id),
++    locationSeeds: mergeSeedListsById(settings.locationSeeds || [], incomingLocationSeeds, 'locationSeeds', moduleEntry.id),
++    clockSeeds: mergeSeedListsById(settings.clockSeeds || [], incomingClockSeeds, 'clockSeeds', moduleEntry.id),
++    slotBindings: nextSlotBindings,
+     loadedModuleIds: Array.from(new Set([...(settings.loadedModuleIds || []), moduleEntry.id])),
+   });
+ }
+ 
++
+ export function buildModuleLibraryEntryFromRuntimeSettings(settings: RuntimeSettings, seed: Partial<ModuleLibraryEntry> = {}, options: { tabId?: string | null } = {}): ModuleLibraryEntry {
+   return {
+     id: typeof seed.id === 'string' && seed.id.trim() ? seed.id.trim() : `module_${Date.now()}`,
+@@ -661,6 +1067,14 @@ export function buildModuleLibraryEntryFromRuntimeSettings(settings: RuntimeSett
+     subagentGroups: sanitizeSubagentLibrary(Array.isArray(seed.subagentGroups) ? seed.subagentGroups : settings.subagentLibrary),
+     starterArtifacts: sanitizeModuleStarterArtifactRefs(Array.isArray(seed.starterArtifacts) ? seed.starterArtifacts : []),
+     runtimeContext: sanitizeRuntimeContextEntries(Array.isArray(seed.runtimeContext) ? seed.runtimeContext : settings.runtimeContext),
++    moduleDependencies: sanitizeIdentifierList(Array.isArray(seed.moduleDependencies) ? seed.moduleDependencies : []),
++    moduleConflicts: sanitizeIdentifierList(Array.isArray(seed.moduleConflicts) ? seed.moduleConflicts : []),
++    requiresSlots: sanitizeStringList(Array.isArray(seed.requiresSlots) ? seed.requiresSlots : [], MODULE_SLOT_NAME_RE) as ModuleSlotName[],
++    providesSlots: sanitizeModuleSlotProvisions(Array.isArray(seed.providesSlots) ? seed.providesSlots : []),
++    sceneSeeds: sanitizeSceneSeeds(Array.isArray(seed.sceneSeeds) ? seed.sceneSeeds : []),
++    encounterSeeds: sanitizeEncounterSeeds(Array.isArray(seed.encounterSeeds) ? seed.encounterSeeds : []),
++    locationSeeds: sanitizeLocationSeeds(Array.isArray(seed.locationSeeds) ? seed.locationSeeds : []),
++    clockSeeds: sanitizeClockSeeds(Array.isArray(seed.clockSeeds) ? seed.clockSeeds : []),
+   };
+ }
+ 
+diff --git a/core/schemas.py b/core/schemas.py
+index a1c3768..011d253 100644
+--- a/core/schemas.py
++++ b/core/schemas.py
+@@ -780,6 +780,352 @@ class ModuleStarterArtifactRef(BaseModel):
+         return v
+ 
+ 
++class SubagentRef(BaseModel):
++    groupName: str
++    agentName: str
++
++    @field_validator("groupName")
++    @classmethod
++    def validate_group_name(cls, v: str) -> str:
++        return _require_safe_identifier(v, label="subagentRef.groupName")
++
++    @field_validator("agentName")
++    @classmethod
++    def validate_agent_name(cls, v: str) -> str:
++        return _require_safe_identifier(v, label="subagentRef.agentName")
++
++
++class StructuredSeedBase(BaseModel):
++    id: str
++    title: str
++    description: str = ""
++    tags: list[str] = Field(default_factory=list)
++    mergePolicy: str = "error"
++    origin: str = "workspace"
++    artifactRef: Optional[str] = None
++    sourceModuleId: Optional[str] = None
++
++    @field_validator("id")
++    @classmethod
++    def validate_id(cls, v: str) -> str:
++        return _require_safe_identifier(v, label="seed.id")
++
++    @field_validator("title")
++    @classmethod
++    def validate_title(cls, v: str) -> str:
++        if not isinstance(v, str):
++            raise ValueError("seed.title must be a string")
++        stripped = v.strip()
++        if not stripped:
++            raise ValueError("seed.title must not be empty")
++        if any(ch in stripped for ch in ("\x00", "\r", "\n")):
++            raise ValueError("seed.title contains unsupported control characters")
++        return stripped
++
++    @field_validator("tags")
++    @classmethod
++    def validate_tags(cls, v: list[str]) -> list[str]:
++        cleaned: list[str] = []
++        seen: set[str] = set()
++        for raw in v or []:
++            tag = str(raw).strip()
++            if not tag or tag in seen:
++                continue
++            seen.add(tag)
++            cleaned.append(tag)
++        return cleaned
++
++    @field_validator("mergePolicy")
++    @classmethod
++    def validate_merge_policy(cls, v: str) -> str:
++        if v not in {"error", "preserve", "replace"}:
++            raise ValueError("seed.mergePolicy must be error, preserve, or replace")
++        return v
++
++    @field_validator("origin")
++    @classmethod
++    def validate_origin(cls, v: str) -> str:
++        return "artifact" if v == "artifact" else "workspace"
++
++    @field_validator("sourceModuleId")
++    @classmethod
++    def validate_source_module_id(cls, v: Optional[str]) -> Optional[str]:
++        if v is None or not str(v).strip():
++            return None
++        return _require_safe_identifier(str(v).strip(), label="seed.sourceModuleId")
++
++
++class SceneSeed(StructuredSeedBase):
++    kind: str = "opening"
++    status: str = "seeded"
++    locationId: Optional[str] = None
++    objective: str = ""
++    situation: str = ""
++    castGroupNames: list[str] = Field(default_factory=list)
++    encounterIds: list[str] = Field(default_factory=list)
++    clockIds: list[str] = Field(default_factory=list)
++
++    @field_validator("kind")
++    @classmethod
++    def validate_kind(cls, v: str) -> str:
++        allowed = {"opening", "travel", "social", "investigation", "combat", "fallback"}
++        if v not in allowed:
++            raise ValueError(f"scene.kind must be one of {sorted(allowed)}")
++        return v
++
++    @field_validator("status")
++    @classmethod
++    def validate_status(cls, v: str) -> str:
++        if v not in {"seeded", "active", "resolved"}:
++            raise ValueError("scene.status must be seeded, active, or resolved")
++        return v
++
++    @field_validator("locationId")
++    @classmethod
++    def validate_location_id(cls, v: Optional[str]) -> Optional[str]:
++        if v is None or not str(v).strip():
++            return None
++        return _require_safe_identifier(str(v).strip(), label="scene.locationId")
++
++    @field_validator("castGroupNames", "encounterIds", "clockIds")
++    @classmethod
++    def validate_identifier_lists(cls, v: list[str], info) -> list[str]:
++        cleaned: list[str] = []
++        seen: set[str] = set()
++        for idx, raw in enumerate(v or []):
++            item = _require_safe_identifier(str(raw).strip(), label=f"scene.{info.field_name}[{idx}]")
++            if item in seen:
++                continue
++            seen.add(item)
++            cleaned.append(item)
++        return cleaned
++
++
++class EncounterSeed(StructuredSeedBase):
++    kind: str = "social_pressure"
++    status: str = "seeded"
++    sceneId: Optional[str] = None
++    locationId: Optional[str] = None
++    participantRefs: list[SubagentRef] = Field(default_factory=list)
++    pressure: str = "medium"
++    stakes: str = ""
++    successAtCost: str = ""
++    falloutOnFail: str = ""
++    suggestedToolIds: list[str] = Field(default_factory=list)
++
++    @field_validator("kind")
++    @classmethod
++    def validate_kind(cls, v: str) -> str:
++        allowed = {"social_pressure", "combat_pressure", "hazard", "investigation", "pursuit"}
++        if v not in allowed:
++            raise ValueError(f"encounter.kind must be one of {sorted(allowed)}")
++        return v
++
++    @field_validator("status")
++    @classmethod
++    def validate_status(cls, v: str) -> str:
++        if v not in {"seeded", "active", "resolved"}:
++            raise ValueError("encounter.status must be seeded, active, or resolved")
++        return v
++
++    @field_validator("sceneId", "locationId")
++    @classmethod
++    def validate_optional_ids(cls, v: Optional[str], info) -> Optional[str]:
++        if v is None or not str(v).strip():
++            return None
++        return _require_safe_identifier(str(v).strip(), label=f"encounter.{info.field_name}")
++
++    @field_validator("pressure")
++    @classmethod
++    def validate_pressure(cls, v: str) -> str:
++        if v not in {"low", "medium", "high"}:
++            raise ValueError("encounter.pressure must be low, medium, or high")
++        return v
++
++    @field_validator("suggestedToolIds")
++    @classmethod
++    def validate_tool_ids(cls, v: list[str]) -> list[str]:
++        cleaned: list[str] = []
++        seen: set[str] = set()
++        for idx, raw in enumerate(v or []):
++            item = _require_safe_identifier(str(raw).strip(), label=f"encounter.suggestedToolIds[{idx}]")
++            if item in seen:
++                continue
++            seen.add(item)
++            cleaned.append(item)
++        return cleaned
++
++
++class LocationSeed(StructuredSeedBase):
++    kind: str = "site"
++    status: str = "seeded"
++    summary: str = ""
++    region: str = ""
++    parentLocationId: Optional[str] = None
++    sceneIds: list[str] = Field(default_factory=list)
++
++    @field_validator("kind")
++    @classmethod
++    def validate_kind(cls, v: str) -> str:
++        allowed = {"inn", "district", "station", "ruin", "wilderness", "settlement", "site"}
++        if v not in allowed:
++            raise ValueError(f"location.kind must be one of {sorted(allowed)}")
++        return v
++
++    @field_validator("status")
++    @classmethod
++    def validate_status(cls, v: str) -> str:
++        if v not in {"seeded", "active", "resolved"}:
++            raise ValueError("location.status must be seeded, active, or resolved")
++        return v
++
++    @field_validator("parentLocationId")
++    @classmethod
++    def validate_parent_location_id(cls, v: Optional[str]) -> Optional[str]:
++        if v is None or not str(v).strip():
++            return None
++        return _require_safe_identifier(str(v).strip(), label="location.parentLocationId")
++
++    @field_validator("sceneIds")
++    @classmethod
++    def validate_scene_ids(cls, v: list[str]) -> list[str]:
++        cleaned: list[str] = []
++        seen: set[str] = set()
++        for idx, raw in enumerate(v or []):
++            item = _require_safe_identifier(str(raw).strip(), label=f"location.sceneIds[{idx}]")
++            if item in seen:
++                continue
++            seen.add(item)
++            cleaned.append(item)
++        return cleaned
++
++
++class ClockSeed(StructuredSeedBase):
++    status: str = "seeded"
++    segments: int = 4
++    progress: int = 0
++    trigger: str = ""
++    consequence: str = ""
++    sceneId: Optional[str] = None
++    locationId: Optional[str] = None
++
++    @field_validator("status")
++    @classmethod
++    def validate_status(cls, v: str) -> str:
++        if v not in {"seeded", "active", "resolved"}:
++            raise ValueError("clock.status must be seeded, active, or resolved")
++        return v
++
++    @field_validator("segments")
++    @classmethod
++    def validate_segments(cls, v: int) -> int:
++        if v < 1 or v > 24:
++            raise ValueError("clock.segments must be between 1 and 24")
++        return v
++
++    @field_validator("progress")
++    @classmethod
++    def validate_progress(cls, v: int) -> int:
++        if v < 0:
++            raise ValueError("clock.progress must be >= 0")
++        return v
++
++    @field_validator("sceneId", "locationId")
++    @classmethod
++    def validate_optional_ids(cls, v: Optional[str], info) -> Optional[str]:
++        if v is None or not str(v).strip():
++            return None
++        return _require_safe_identifier(str(v).strip(), label=f"clock.{info.field_name}")
++
++    @model_validator(mode="after")
++    def validate_progress_within_segments(self):
++        if self.progress > self.segments:
++            raise ValueError("clock.progress must not exceed clock.segments")
++        return self
++
++
++class ModuleSlotProvision(BaseModel):
++    slot: str
++    entityType: str
++    entityId: str
++    policy: str = "exclusive"
++
++    @field_validator("slot")
++    @classmethod
++    def validate_slot(cls, v: str) -> str:
++        allowed = {
++            "opening_scene",
++            "default_location",
++            "starter_encounter",
++            "starter_clock",
++            "primary_cast",
++            "fallback_referee_frame",
++        }
++        if v not in allowed:
++            raise ValueError(f"module.providesSlots.slot must be one of {sorted(allowed)}")
++        return v
++
++    @field_validator("entityType")
++    @classmethod
++    def validate_entity_type(cls, v: str) -> str:
++        allowed = {"scene", "encounter", "location", "clock", "cast_group"}
++        if v not in allowed:
++            raise ValueError(f"module.providesSlots.entityType must be one of {sorted(allowed)}")
++        return v
++
++    @field_validator("entityId")
++    @classmethod
++    def validate_entity_id(cls, v: str) -> str:
++        return _require_safe_identifier(v, label="module.providesSlots.entityId")
++
++    @field_validator("policy")
++    @classmethod
++    def validate_policy(cls, v: str) -> str:
++        if v not in {"exclusive", "append", "replace"}:
++            raise ValueError("module.providesSlots.policy must be exclusive, append, or replace")
++        return v
++
++
++class RuntimeSlotBinding(BaseModel):
++    slot: str
++    entityType: str
++    entityId: str
++    providerModuleId: str
++
++    @field_validator("slot")
++    @classmethod
++    def validate_slot(cls, v: str) -> str:
++        allowed = {
++            "opening_scene",
++            "default_location",
++            "starter_encounter",
++            "starter_clock",
++            "primary_cast",
++            "fallback_referee_frame",
++        }
++        if v not in allowed:
++            raise ValueError(f"runtime_settings.slotBindings.slot must be one of {sorted(allowed)}")
++        return v
++
++    @field_validator("entityType")
++    @classmethod
++    def validate_entity_type(cls, v: str) -> str:
++        allowed = {"scene", "encounter", "location", "clock", "cast_group"}
++        if v not in allowed:
++            raise ValueError(f"runtime_settings.slotBindings.entityType must be one of {sorted(allowed)}")
++        return v
++
++    @field_validator("entityId")
++    @classmethod
++    def validate_entity_id(cls, v: str) -> str:
++        return _require_safe_identifier(v, label="runtime_settings.slotBindings.entityId")
++
++    @field_validator("providerModuleId")
++    @classmethod
++    def validate_provider_module_id(cls, v: str) -> str:
++        return _require_safe_identifier(v, label="runtime_settings.slotBindings.providerModuleId")
++
++
+ class ModuleLibraryEntry(BaseModel):
+     id: str
+     name: str
+@@ -798,6 +1144,14 @@ class ModuleLibraryEntry(BaseModel):
+     subagentGroups: list[SubagentGroup] = Field(default_factory=list)
+     starterArtifacts: list[ModuleStarterArtifactRef] = Field(default_factory=list)
+     runtimeContext: list[dict[str, str]] = Field(default_factory=list)
++    moduleDependencies: list[str] = Field(default_factory=list)
++    moduleConflicts: list[str] = Field(default_factory=list)
++    requiresSlots: list[str] = Field(default_factory=list)
++    providesSlots: list[ModuleSlotProvision] = Field(default_factory=list)
++    sceneSeeds: list[SceneSeed] = Field(default_factory=list)
++    encounterSeeds: list[EncounterSeed] = Field(default_factory=list)
++    locationSeeds: list[LocationSeed] = Field(default_factory=list)
++    clockSeeds: list[ClockSeed] = Field(default_factory=list)
+ 
+     @field_validator("id", "name")
+     @classmethod
+@@ -814,7 +1168,7 @@ class ModuleLibraryEntry(BaseModel):
+     @field_validator("category")
+     @classmethod
+     def validate_category(cls, v: str) -> str:
+-        allowed = {"world", "rules", "persona", "party", "utility", "mixed"}
++        allowed = {"world", "rules", "persona", "party", "utility", "adventure", "mixed"}
+         return v if v in allowed else "mixed"
+ 
+     @field_validator("tags")
+@@ -873,6 +1227,44 @@ class ModuleLibraryEntry(BaseModel):
+     def validate_origin(cls, v: str) -> str:
+         return "artifact" if v == "artifact" else "workspace"
+ 
++    @field_validator("moduleDependencies", "moduleConflicts")
++    @classmethod
++    def validate_module_refs(cls, v: list[str], info) -> list[str]:
++        cleaned: list[str] = []
++        seen: set[str] = set()
++        for idx, raw in enumerate(v or []):
++            item = _require_safe_identifier(str(raw).strip(), label=f"module.{info.field_name}[{idx}]")
++            if item in seen:
++                continue
++            seen.add(item)
++            cleaned.append(item)
++        return cleaned
++
++    @field_validator("requiresSlots")
++    @classmethod
++    def validate_required_slots(cls, v: list[str]) -> list[str]:
++        allowed = {
++            "opening_scene",
++            "default_location",
++            "starter_encounter",
++            "starter_clock",
++            "primary_cast",
++            "fallback_referee_frame",
++        }
++        cleaned: list[str] = []
++        seen: set[str] = set()
++        for idx, raw in enumerate(v or []):
++            item = str(raw or "").strip()
++            if not item:
++                continue
++            if item not in allowed:
++                raise ValueError(f"module.requiresSlots[{idx}] must be one of {sorted(allowed)}")
++            if item in seen:
++                continue
++            seen.add(item)
++            cleaned.append(item)
++        return cleaned
++
+     @field_validator("runtimeContext")
+     @classmethod
+     def validate_runtime_context(cls, v: list[dict[str, str]]) -> list[dict[str, str]]:
+@@ -888,6 +1280,28 @@ class ModuleLibraryEntry(BaseModel):
+             cleaned.append({'key': key, 'value': value})
+         return cleaned
+ 
++    @model_validator(mode="after")
++    def validate_structured_module_refs(self):
++        if set(self.moduleDependencies).intersection(self.moduleConflicts):
++            raise ValueError("moduleDependencies and moduleConflicts must not overlap")
++        entity_ids = {
++            "scene": {item.id for item in self.sceneSeeds},
++            "encounter": {item.id for item in self.encounterSeeds},
++            "location": {item.id for item in self.locationSeeds},
++            "clock": {item.id for item in self.clockSeeds},
++            "cast_group": {item.name for item in self.subagentGroups},
++        }
++        seen_slots: set[tuple[str, str, str]] = set()
++        for provision in self.providesSlots:
++            key = (provision.slot, provision.entityType, provision.entityId)
++            if key in seen_slots:
++                raise ValueError(f"module.providesSlots contains duplicate binding {key}")
++            seen_slots.add(key)
++            if provision.entityId not in entity_ids.get(provision.entityType, set()):
++                raise ValueError(
++                    f"module.providesSlots references missing {provision.entityType} '{provision.entityId}' in module '{self.id}'"
++                )
++        return self
+ 
+ 
+ class RuntimeSettings(BaseModel):
+@@ -905,6 +1319,11 @@ class RuntimeSettings(BaseModel):
+     loadedModuleIds: list[str] = Field(default_factory=list)
+     runtimeContext: list[dict[str, str]] = Field(default_factory=list)
+     shellExecutionEnabled: bool = False
++    sceneSeeds: list[SceneSeed] = Field(default_factory=list)
++    encounterSeeds: list[EncounterSeed] = Field(default_factory=list)
++    locationSeeds: list[LocationSeed] = Field(default_factory=list)
++    clockSeeds: list[ClockSeed] = Field(default_factory=list)
++    slotBindings: list[RuntimeSlotBinding] = Field(default_factory=list)
+ 
+     @field_validator("recursionLimit")
+     @classmethod
+@@ -952,6 +1371,44 @@ class RuntimeSettings(BaseModel):
+             cleaned.append(module_id)
+         return cleaned
+ 
++    @field_validator("moduleDependencies", "moduleConflicts")
++    @classmethod
++    def validate_module_refs(cls, v: list[str], info) -> list[str]:
++        cleaned: list[str] = []
++        seen: set[str] = set()
++        for idx, raw in enumerate(v or []):
++            item = _require_safe_identifier(str(raw).strip(), label=f"module.{info.field_name}[{idx}]")
++            if item in seen:
++                continue
++            seen.add(item)
++            cleaned.append(item)
++        return cleaned
++
++    @field_validator("requiresSlots")
++    @classmethod
++    def validate_required_slots(cls, v: list[str]) -> list[str]:
++        allowed = {
++            "opening_scene",
++            "default_location",
++            "starter_encounter",
++            "starter_clock",
++            "primary_cast",
++            "fallback_referee_frame",
++        }
++        cleaned: list[str] = []
++        seen: set[str] = set()
++        for idx, raw in enumerate(v or []):
++            item = str(raw or "").strip()
++            if not item:
++                continue
++            if item not in allowed:
++                raise ValueError(f"module.requiresSlots[{idx}] must be one of {sorted(allowed)}")
++            if item in seen:
++                continue
++            seen.add(item)
++            cleaned.append(item)
++        return cleaned
++
+     @field_validator("runtimeContext")
+     @classmethod
+     def validate_runtime_context(cls, v: list[dict[str, str]]) -> list[dict[str, str]]:

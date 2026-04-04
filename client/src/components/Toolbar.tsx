@@ -4,6 +4,7 @@ import { type ImportDiagnostic, useAppStore } from '../store';
 import { getModeContract, projectModeAllowsCompile, projectModeAllowsRuntime } from '../capabilities';
 import SettingsShell from './SettingsShell';
 import { buildProjectPersistenceSummary } from '../store/workspace';
+import { getTabletopVisualProfile } from '../jdr/theme';
 import {
   Save,
   FolderKanban,
@@ -155,10 +156,12 @@ export default function Toolbar() {
   const [showCanvasHelp, setShowCanvasHelp] = useState(false);
   const [showDetachedActions, setShowDetachedActions] = useState(false);
   const [compileNotice, setCompileNotice] = useState<CompileNotice | null>(null);
+  const [obsidianExporting, setObsidianExporting] = useState(false);
 
   const activeTab = tabs.find((tab) => tab.id === activeTabId);
   const shellExecutionEnabled = Boolean(activeTab?.runtimeSettings?.shellExecutionEnabled);
   const currentSurfaceTruth = describeCurrentSurfaceTruth(activeTab, isAsync);
+  const tabletopProfile = getTabletopVisualProfile(activeTab?.runtimeSettings);
 
   const semanticLinkKinds = Object.entries(graphValidation?.semanticEdgeSummary || {}).filter(([kind, count]) => kind !== 'direct_flow' && count > 0);
   const graphScopeMarkerCount = graphValidation?.graphScopeMarkerIds?.size || 0;
@@ -327,6 +330,60 @@ export default function Toolbar() {
       return;
     }
     doCompile();
+  };
+
+  const handleExportObsidianVault = async () => {
+    setCompileNotice(null);
+    setObsidianExporting(true);
+    try {
+      const json = exportJson();
+      const res = await fetch('/api/obsidian/vault', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: json,
+      });
+      if (!res.ok) {
+        let errPayload: unknown = null;
+        try {
+          errPayload = await res.json();
+        } catch {
+          errPayload = null;
+        }
+        const payloadRecord = errPayload && typeof errPayload === 'object' ? errPayload as Record<string, unknown> : null;
+        const details = normalizeCompileDetails(payloadRecord?.errors ?? payloadRecord?.detail ?? errPayload);
+        const summary = typeof payloadRecord?.summary === 'string'
+          ? payloadRecord.summary
+          : typeof payloadRecord?.message === 'string'
+            ? payloadRecord.message
+            : 'Obsidian GM vault export failed.';
+        setCompileNotice({
+          tone: 'error',
+          stage: 'during_compile',
+          title: 'Obsidian GM export failed',
+          message: summary,
+          details,
+        });
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const parsed = JSON.parse(json);
+      a.download = `${parsed.graph_id}-obsidian-vault.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setCompileNotice({
+        tone: 'error',
+        stage: 'compile_request',
+        title: 'Obsidian export request failed',
+        message: err instanceof Error ? err.message : String(err),
+        details: [],
+      });
+    } finally {
+      setObsidianExporting(false);
+    }
   };
 
   return (
@@ -524,6 +581,28 @@ export default function Toolbar() {
         {saveStatus === 'error' && <AlertCircle size={12} className="text-red-400 shrink-0" />}
         <ToolbarButton icon={FolderKanban} label="Projects" onClick={toggleProjectManager} dataTestId="toolbar-open-projects" />
         <ToolbarButton icon={Trash2} label="Delete" onClick={deleteSelected} variant="danger" />
+        {tabletopProfile.isTabletop && (
+          <>
+            <ToolbarButton
+              icon={Boxes}
+              label="Modules"
+              onClick={() => window.dispatchEvent(new CustomEvent('langsuite:open-tabletop-modules'))}
+              title="Open the bounded JDR module library for the active tabletop graph."
+            />
+            <ToolbarButton
+              icon={GitBranch}
+              label="Obsidian graph"
+              onClick={() => window.dispatchEvent(new CustomEvent('langsuite:open-obsidian-graph'))}
+              title="Open a graphical Obsidian companion view derived from the active tabletop graph."
+            />
+            <ToolbarButton
+              icon={obsidianExporting ? Loader2 : Link}
+              label={obsidianExporting ? 'Exporting GM vault…' : 'Obsidian GM vault'}
+              onClick={() => { void handleExportObsidianVault(); }}
+              title="Export a markdown GM companion vault for Obsidian. The graph remains the runtime source of truth."
+            />
+          </>
+        )}
 
         <div className="h-5 w-px bg-panel-border shrink-0" />
 
@@ -762,6 +841,7 @@ function ToolbarButton({
   variant,
   dataTestId,
   active,
+  title,
 }: {
   icon: LucideIcon;
   label: string;
@@ -769,6 +849,7 @@ function ToolbarButton({
   variant?: 'danger';
   dataTestId?: string;
   active?: boolean;
+  title?: string;
 }) {
   const hoverClass =
     variant === 'danger'
@@ -779,7 +860,7 @@ function ToolbarButton({
   return (
     <button
       onClick={onClick}
-      title={label}
+      title={title || label}
       data-testid={dataTestId}
       className={`w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 transition-all ${hoverClass}`}
     >
