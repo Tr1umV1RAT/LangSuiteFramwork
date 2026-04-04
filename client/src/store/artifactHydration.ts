@@ -80,12 +80,16 @@ function parseToolNodeParams(tool: ArtifactTool): Record<string, unknown> {
       base.provider = params.provider || 'openai';
       base.model_name = params.model_name || 'gpt-4o-mini';
       base.api_key_env = params.api_key_env || '';
+      base.api_base_url = params.api_base_url || '';
       base.temperature = typeof params.temperature === 'number' ? params.temperature : 0.3;
       break;
     case 'tool_llm_worker':
       base.system_prompt = params.system_prompt || 'Tu es un assistant expert.';
       base.provider = params.provider || 'openai';
       base.model_name = params.model_name || 'gpt-4o-mini';
+      base.api_key_env = params.api_key_env || '';
+      base.api_base_url = params.api_base_url || '';
+      base.temperature = typeof params.temperature === 'number' ? params.temperature : 0;
       break;
     case 'rest_api':
       base.url = params.url || '';

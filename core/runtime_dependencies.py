@@ -10,6 +10,33 @@ BASE_REQUIREMENTS = {
     'langgraph': ('langgraph', 'generated graph runtime'),
     'langchain': ('langchain', 'generated model/runtime helpers'),
     'langchain_core': ('langchain-core', 'generated state/message types'),
+    'requests': ('requests', 'generated tool runtime helpers'),
+}
+
+REQUIREMENT_SPECS = {
+    'langgraph': 'langgraph>=0.2.0',
+    'langchain': 'langchain>=0.3.0',
+    'langchain-core': 'langchain-core>=0.3.0',
+    'requests': 'requests>=2.31.0',
+    'langchain-community': 'langchain-community>=0.3.0',
+    'langchain-experimental': 'langchain-experimental>=0.3.0',
+    'langchain-openai': 'langchain-openai>=0.2.0',
+    'langchain-anthropic': 'langchain-anthropic>=0.3.0',
+    'langchain-google-genai': 'langchain-google-genai>=2.0.0',
+    'langchain-google-vertexai': 'langchain-google-vertexai>=2.0.0',
+    'langchain-ollama': 'langchain-ollama>=0.2.0',
+    'langchain-mistralai': 'langchain-mistralai>=0.2.0',
+    'tenacity': 'tenacity>=9.0.0',
+    'langgraph-checkpoint': 'langgraph-checkpoint>=2.0.0',
+    'langgraph-checkpoint-sqlite': 'langgraph-checkpoint-sqlite>=2.0.0',
+    'aiosqlite': 'aiosqlite>=0.20.0',
+    'langchain-huggingface': 'langchain-huggingface>=0.1.0',
+    'langchain-chroma': 'langchain-chroma>=0.2.0',
+    'langchain-tavily': 'langchain-tavily>=0.1.0',
+    'duckduckgo-search': 'duckduckgo-search>=8.1.1',
+    'pygithub': 'pygithub>=2.6.0',
+    'playwright': 'playwright>=1.40.0',
+    'pydantic': 'pydantic>=2.0.0',
 }
 
 OPTIONAL_NODE_REQUIREMENTS = {
@@ -228,6 +255,39 @@ def _iter_payload_tool_like_entries(payload: GraphPayload) -> list[tuple[str, di
     return entries
 
 
+def _payload_uses_checkpoint(payload: GraphPayload) -> bool:
+    interrupt_before_nodes = payload.interrupt_before_nodes or [
+        n.id for n in payload.nodes if n.type == 'human_interrupt'
+    ]
+    has_user_input_async = (
+        payload.is_async
+        and any(n.type == 'user_input_node' for n in payload.nodes)
+    )
+    return bool(
+        payload.use_checkpoint
+        or any(n.type == 'memory_checkpoint' for n in payload.nodes)
+        or len(interrupt_before_nodes) > 0
+        or has_user_input_async
+    )
+
+
+LLM_WITH_STRUCTURED_OUTPUT_TYPES = {'llm_chat', 'react_agent', 'sub_agent'}
+
+
+def _payload_uses_pydantic(payload: GraphPayload) -> bool:
+    for node in payload.nodes:
+        if str(getattr(node, 'type', '') or '') not in LLM_WITH_STRUCTURED_OUTPUT_TYPES:
+            continue
+        params = getattr(node, 'params', None)
+        if hasattr(params, 'model_dump'):
+            params = params.model_dump()
+        elif not isinstance(params, dict):
+            params = {}
+        if params.get('structured_schema'):
+            return True
+    return False
+
+
 def collect_runtime_dependency_requirements(payload: GraphPayload) -> list[dict[str, str]]:
     requirements: dict[str, dict[str, str]] = {}
 
@@ -237,12 +297,28 @@ def collect_runtime_dependency_requirements(payload: GraphPayload) -> list[dict[
     for module_name, (pip_name, reason) in BASE_REQUIREMENTS.items():
         add(module_name, pip_name, reason)
 
+    if _payload_uses_checkpoint(payload):
+        add('langgraph.checkpoint', 'langgraph-checkpoint', 'checkpoint-backed pause/resume runtime')
+        if getattr(getattr(payload, 'config', None), 'persistence_type', 'memory') == 'sqlite':
+            add('langgraph.checkpoint.sqlite', 'langgraph-checkpoint-sqlite', 'SQLite checkpoint-backed pause/resume runtime')
+            if payload.is_async:
+                add('aiosqlite', 'aiosqlite', 'async SQLite checkpoint runtime')
+
+    if _payload_uses_pydantic(payload):
+        add('pydantic', 'pydantic', 'structured output schemas')
+
     entries = _iter_payload_tool_like_entries(payload)
     for entry_type, params in entries:
         for module_name, (pip_name, reason) in OPTIONAL_NODE_REQUIREMENTS.get(entry_type, {}).items():
             add(module_name, pip_name, reason)
         for module_name, (pip_name, reason) in OPTIONAL_TOOL_OR_NODE_REQUIREMENTS.get(entry_type, {}).items():
             add(module_name, pip_name, reason)
+        retries = params.get('retries')
+        try:
+            if retries is not None and int(retries) > 0:
+                add('tenacity', 'tenacity', 'bounded retry helpers for authored runtime surfaces')
+        except Exception:
+            pass
         provider = normalize_provider(params.get('provider'))
         requirement = provider_runtime_requirement(provider)
         if requirement is not None:
@@ -250,6 +326,20 @@ def collect_runtime_dependency_requirements(payload: GraphPayload) -> list[dict[
             add(module_name, pip_name, reason)
 
     return list(requirements.values())
+
+
+
+def collect_runtime_requirement_specs(payload: GraphPayload) -> list[str]:
+    specs: list[str] = []
+    seen: set[str] = set()
+    for requirement in collect_runtime_dependency_requirements(payload):
+        package = requirement['package']
+        spec = REQUIREMENT_SPECS.get(package, package)
+        if spec in seen:
+            continue
+        seen.add(spec)
+        specs.append(spec)
+    return specs
 
 
 def find_missing_runtime_dependencies(payload: GraphPayload) -> list[dict[str, str]]:

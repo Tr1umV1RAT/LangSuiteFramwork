@@ -69,6 +69,7 @@ function ChoiceGroup<T extends string>({ value, onChange, options }: { value: T;
 const PRESETS: { value: WorkspacePreset; label: string; hint: string }[] = [
   { value: 'graph_simple', label: 'Graph Simple', hint: 'Compact graph-first editing with a calm palette and restrained metadata.' },
   { value: 'graph_memory', label: 'Graph + Memory', hint: 'Keeps the graph workflow simple while surfacing memory/RAG building blocks earlier.' },
+  { value: 'tabletop_demo', label: 'Tabletop Demo', hint: 'Guided graph-first shell for tabletop sessions with calmer defaults and a session-friendly state panel.' },
   { value: 'debug_build', label: 'Debug Build', hint: 'Execution-first preset with broader palette exposure and visible technical cues.' },
   { value: 'advanced_authoring', label: 'Advanced Authoring', hint: 'Keeps the richer suite/editor semantics visible for deeper authoring.' },
 ];

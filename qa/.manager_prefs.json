@@ -2,7 +2,7 @@
   "preview_build": false,
   "no_browser": false,
   "dry_run": false,
-  "desktop_shortcut": true,
+  "desktop_shortcut": false,
   "start_menu_shortcut": false,
   "reinstall_node_modules": true,
   "skip_frontend_build": false,

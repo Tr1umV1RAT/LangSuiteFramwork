@@ -131,6 +131,27 @@ export function getWorkspacePresetPatch(preset: WorkspacePreset): Partial<Prefer
         statePanelWidth: 226,
         runPanelHeightPercent: 34,
       };
+    case 'tabletop_demo':
+      return {
+        defaultEditorMode: 'simple',
+        uiDensity: 'standard',
+        showQuickStart: true,
+        showIncompatibleBlocks: false,
+        compactPalette: false,
+        paletteMode: 'quickstart',
+        palettePreset: 'graph',
+        defaultRunPanelTab: 'inputs',
+        showJsonTab: true,
+        autoScrollLogs: true,
+        reducedTechnicalBadgesInSimpleMode: true,
+        showArtifactBadgesInSimpleMode: false,
+        showScopePathInSimpleMode: false,
+        deEmphasizeJsonInSimpleMode: true,
+        blocksPanelWidth: 204,
+        debugPanelWidth: 190,
+        statePanelWidth: 220,
+        runPanelHeightPercent: 32,
+      };
     case 'graph_simple':
     default:
       return {

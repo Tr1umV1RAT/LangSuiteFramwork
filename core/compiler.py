@@ -12,6 +12,7 @@ from core.schemas import GraphPayload, GraphNode, GraphEdge
 from core.provider_contracts import normalize_provider, openai_compatible_provider_families, provider_env_var_map, load_provider_contracts
 from core.bridge_lowering import BridgeLoweringError, embed_langchain_agent_reference, lower_langchain_agent_reference
 from core.prompt_strips import resolve_prompt_for_node, resolve_prompt_for_subagent, resolve_prompt_for_tool, build_prompt_resolution_provenance
+from core.runtime_dependencies import collect_runtime_requirement_specs
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 
@@ -498,6 +499,7 @@ def _build_context(payload: GraphPayload) -> dict:
         "runtime_settings_repr": repr(runtime_settings),
         "provider_contracts": load_provider_contracts(),
         "provider_env_vars": provider_env_var_map(),
+        "runtime_requirement_specs": collect_runtime_requirement_specs(payload),
         "openai_compatible_provider_families": list(openai_compatible_provider_families()),
         "external_artifacts": external_artifacts,
         "external_artifacts_repr": repr(external_artifacts),

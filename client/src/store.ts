@@ -122,6 +122,7 @@ import {
   makeEmptyRootTab,
   parseWorkspaceSnapshotForImport,
   sanitizeRuntimeSettings,
+  remapPromptAssignmentsToTabId,
 } from './store/workspace';
 
 let nodeCounter = 0;
@@ -354,6 +355,15 @@ function validateEditorState(state: Pick<AppState, 'nodes' | 'edges' | 'tabs' | 
         code: 'invalid_provider',
         nodeId: node.id,
         message: `Node "${nodeLabel}" uses unsupported provider "${provider}".`,
+      });
+    }
+    const runtimeMeta = getNodeRuntimeMeta(nodeType);
+    if (runtimeMeta?.providerBacked && !normalizedProvider) {
+      pushValidationIssue(issues, {
+        severity: 'warning',
+        code: 'missing_provider_config',
+        nodeId: node.id,
+        message: `Node "${nodeLabel}" is authored but still needs a provider selection before truthful runtime execution.`,
       });
     }
     if (normalizedProvider && providerMeta?.uiSelectable === false) {
@@ -1064,7 +1074,43 @@ export const useAppStore = create<AppState>()((set, get) => ({
   _syncing: false,
 
   onNodesChange: (changes: NodeChange[]) => {
-    set({ nodes: applyNodeChanges(changes, get().nodes), graphValidation: null });
+    const currentNodes = get().nodes;
+    const currentEdges = get().edges;
+    const nextNodes = applyNodeChanges(changes, currentNodes);
+    const nextNodeIds = new Set(nextNodes.map((node: Node) => node.id));
+    const removedNodeIds = new Set(currentNodes.filter((node: Node) => !nextNodeIds.has(node.id)).map((node: Node) => node.id));
+
+    let nextEdges = currentEdges;
+    if (removedNodeIds.size > 0) {
+      nextEdges = currentEdges.filter((edge: Edge) => !removedNodeIds.has(edge.source) && !removedNodeIds.has(edge.target));
+    }
+
+    set({ nodes: nextNodes, edges: nextEdges, graphValidation: null });
+
+    if (removedNodeIds.size > 0) {
+      const toolLinkedTargets = new Map<string, string[]>();
+      for (const edge of nextEdges) {
+        if (edge.sourceHandle === 'tool_out' && edge.targetHandle === 'tools_in' && edge.target) {
+          const current = toolLinkedTargets.get(edge.target) || [];
+          current.push(edge.source);
+          toolLinkedTargets.set(edge.target, current);
+        }
+      }
+
+      for (const node of nextNodes) {
+        const params = getNodeParams(node.data);
+        if (!Object.prototype.hasOwnProperty.call(params, 'tools_linked')) continue;
+        const edgeLinked = toolLinkedTargets.get(node.id) || [];
+        const manualLinked = Array.isArray(params.tools_linked)
+          ? (params.tools_linked as unknown[]).map((value) => String(value)).filter((toolId) => nextNodeIds.has(toolId))
+          : [];
+        const deduped = (edgeLinked.length > 0 ? edgeLinked : manualLinked).filter((toolId, idx, arr) => arr.indexOf(toolId) === idx);
+        if (JSON.stringify(manualLinked) !== JSON.stringify(deduped)) {
+          get().updateNodeParam(node.id, 'tools_linked', deduped);
+        }
+      }
+    }
+
     get()._markActiveTabDirty();
     if (!get()._syncing) get().sendSync();
   },
@@ -1709,6 +1755,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
             provider: params.provider || 'openai',
             model_name: params.model_name || 'gpt-4o-mini',
             api_key_env: params.api_key_env || '',
+            api_base_url: params.api_base_url || '',
             temperature: typeof params.temperature === 'number' ? params.temperature : 0.3,
           };
         }
@@ -1717,6 +1764,9 @@ export const useAppStore = create<AppState>()((set, get) => ({
             system_prompt: params.system_prompt || 'Tu es un assistant expert.',
             provider: params.provider || 'openai',
             model_name: params.model_name || 'gpt-4o-mini',
+            api_key_env: params.api_key_env || '',
+            api_base_url: params.api_base_url || '',
+            temperature: typeof params.temperature === 'number' ? params.temperature : 0,
           };
         }
         const needsParams = ['rest_api', 'web_search', 'brave_search', 'duckduckgo_search', 'tavily_extract', 'api_call', 'requests_get', 'requests_post', 'fs_list_dir', 'fs_read_file', 'fs_glob', 'fs_grep', 'fs_write_file', 'fs_edit_file', 'fs_apply_patch', 'shell_command', 'sql_query', 'sql_list_tables', 'sql_get_schema', 'sql_query_check'];
@@ -1886,21 +1936,29 @@ export const useAppStore = create<AppState>()((set, get) => ({
       nodes.filter((n: Node) => n.data.nodeType === 'logic_router').map((n: Node) => n.id),
     );
 
-    const apiEdges = edges.map((e: Edge) => {
-      if (routerIds.has(e.source)) {
-        return {
-          source: e.source,
-          target: e.target,
-          type: 'conditional',
-          router_id: e.source,
-          condition: e.sourceHandle || '',
-        };
-      }
-      if (routerIds.has(e.target)) {
+    const apiNodeIds = new Set(
+      apiNodes
+        .filter((node): node is Record<string, unknown> => Boolean(node))
+        .map((node) => String(node.id)),
+    );
+
+    const apiEdges = edges
+      .filter((e: Edge) => apiNodeIds.has(String(e.source)) && apiNodeIds.has(String(e.target)))
+      .map((e: Edge) => {
+        if (routerIds.has(e.source)) {
+          return {
+            source: e.source,
+            target: e.target,
+            type: 'conditional',
+            router_id: e.source,
+            condition: e.sourceHandle || '',
+          };
+        }
+        if (routerIds.has(e.target)) {
+          return { source: e.source, target: e.target, type: 'direct' };
+        }
         return { source: e.source, target: e.target, type: 'direct' };
-      }
-      return { source: e.source, target: e.target, type: 'direct' };
-    });
+      });
 
     const hasCatchErrors = nodes.some((n: Node) => {
       const params = getNodeParams(n.data);
@@ -2046,6 +2104,13 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const inferredArtifactType: ArtifactType = normalizeWorkspaceArtifactType(meta?.artifactType, scopeKind);
     const inferredExecutionProfile: ExecutionProfile = normalizeWorkspaceExecutionProfile(meta?.executionProfile, isAsync, scopeKind, inferredArtifactType);
     const inferredProjectMode: ProjectMode = normalizeProjectMode(meta?.projectMode, inferredArtifactType, inferredExecutionProfile);
+    const sanitizedRuntimeSettings = sanitizeRuntimeSettings(meta?.runtimeSettings, inferredProjectMode);
+    const runtimeSettings = sanitizedRuntimeSettings.promptStripAssignments.length > 0
+      ? {
+          ...sanitizedRuntimeSettings,
+          promptStripAssignments: remapPromptAssignmentsToTabId(sanitizedRuntimeSettings.promptStripAssignments, newTabId),
+        }
+      : sanitizedRuntimeSettings;
     const newTab: Tab = {
       id: newTabId,
       projectId,
@@ -2064,7 +2129,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
       artifactType: inferredArtifactType,
       executionProfile: inferredExecutionProfile,
       projectMode: inferredProjectMode,
-      runtimeSettings: sanitizeRuntimeSettings(meta?.runtimeSettings, inferredProjectMode),
+      runtimeSettings,
     };
     const nextTabs = scopeKind === 'subgraph' ? [...updatedTabs, newTab] : [newTab];
     set({

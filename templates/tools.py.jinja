@@ -1732,7 +1732,6 @@ def {{ t.id }}(query: str) -> str:
         return f"GitHub read error: {str(e)}"
 
 {% elif t.type == 'rpg_dice_roller' %}
-{% elif t.type == 'rpg_dice_roller' %}
 @tool
 def {{ t.id }}(notation: str) -> str:
     """{{ t.description | default("Simule un jet de dés pour un jeu de rôle. Notation standard RPG : 1d20, 2d6, 3d8+2.", true) }}"""

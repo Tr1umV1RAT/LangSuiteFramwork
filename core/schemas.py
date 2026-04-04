@@ -780,6 +780,504 @@ class ModuleStarterArtifactRef(BaseModel):
         return v
 
 
+class SubagentRef(BaseModel):
+    groupName: str
+    agentName: str
+
+    @field_validator("groupName")
+    @classmethod
+    def validate_group_name(cls, v: str) -> str:
+        return _require_safe_identifier(v, label="subagentRef.groupName")
+
+    @field_validator("agentName")
+    @classmethod
+    def validate_agent_name(cls, v: str) -> str:
+        return _require_safe_identifier(v, label="subagentRef.agentName")
+
+
+class StructuredSeedBase(BaseModel):
+    id: str
+    title: str
+    description: str = ""
+    tags: list[str] = Field(default_factory=list)
+    mergePolicy: str = "error"
+    origin: str = "workspace"
+    artifactRef: Optional[str] = None
+    sourceModuleId: Optional[str] = None
+
+    @field_validator("id")
+    @classmethod
+    def validate_id(cls, v: str) -> str:
+        return _require_safe_identifier(v, label="seed.id")
+
+    @field_validator("title")
+    @classmethod
+    def validate_title(cls, v: str) -> str:
+        if not isinstance(v, str):
+            raise ValueError("seed.title must be a string")
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError("seed.title must not be empty")
+        if any(ch in stripped for ch in ("\x00", "\r", "\n")):
+            raise ValueError("seed.title contains unsupported control characters")
+        return stripped
+
+    @field_validator("tags")
+    @classmethod
+    def validate_tags(cls, v: list[str]) -> list[str]:
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for raw in v or []:
+            tag = str(raw).strip()
+            if not tag or tag in seen:
+                continue
+            seen.add(tag)
+            cleaned.append(tag)
+        return cleaned
+
+    @field_validator("mergePolicy")
+    @classmethod
+    def validate_merge_policy(cls, v: str) -> str:
+        if v not in {"error", "preserve", "replace"}:
+            raise ValueError("seed.mergePolicy must be error, preserve, or replace")
+        return v
+
+    @field_validator("origin")
+    @classmethod
+    def validate_origin(cls, v: str) -> str:
+        return "artifact" if v == "artifact" else "workspace"
+
+    @field_validator("sourceModuleId")
+    @classmethod
+    def validate_source_module_id(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or not str(v).strip():
+            return None
+        return _require_safe_identifier(str(v).strip(), label="seed.sourceModuleId")
+
+
+class SceneSeed(StructuredSeedBase):
+    kind: str = "opening"
+    status: str = "seeded"
+    locationId: Optional[str] = None
+    objective: str = ""
+    situation: str = ""
+    castGroupNames: list[str] = Field(default_factory=list)
+    encounterIds: list[str] = Field(default_factory=list)
+    clockIds: list[str] = Field(default_factory=list)
+
+    @field_validator("kind")
+    @classmethod
+    def validate_kind(cls, v: str) -> str:
+        allowed = {"opening", "travel", "social", "investigation", "combat", "fallback"}
+        if v not in allowed:
+            raise ValueError(f"scene.kind must be one of {sorted(allowed)}")
+        return v
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v: str) -> str:
+        if v not in {"seeded", "active", "resolved"}:
+            raise ValueError("scene.status must be seeded, active, or resolved")
+        return v
+
+    @field_validator("locationId")
+    @classmethod
+    def validate_location_id(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or not str(v).strip():
+            return None
+        return _require_safe_identifier(str(v).strip(), label="scene.locationId")
+
+    @field_validator("castGroupNames", "encounterIds", "clockIds")
+    @classmethod
+    def validate_identifier_lists(cls, v: list[str], info) -> list[str]:
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for idx, raw in enumerate(v or []):
+            item = _require_safe_identifier(str(raw).strip(), label=f"scene.{info.field_name}[{idx}]")
+            if item in seen:
+                continue
+            seen.add(item)
+            cleaned.append(item)
+        return cleaned
+
+
+class EncounterSeed(StructuredSeedBase):
+    kind: str = "social_pressure"
+    status: str = "seeded"
+    sceneId: Optional[str] = None
+    locationId: Optional[str] = None
+    participantRefs: list[SubagentRef] = Field(default_factory=list)
+    pressure: str = "medium"
+    stakes: str = ""
+    successAtCost: str = ""
+    falloutOnFail: str = ""
+    suggestedToolIds: list[str] = Field(default_factory=list)
+
+    @field_validator("kind")
+    @classmethod
+    def validate_kind(cls, v: str) -> str:
+        allowed = {"social_pressure", "combat_pressure", "hazard", "investigation", "pursuit"}
+        if v not in allowed:
+            raise ValueError(f"encounter.kind must be one of {sorted(allowed)}")
+        return v
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v: str) -> str:
+        if v not in {"seeded", "active", "resolved"}:
+            raise ValueError("encounter.status must be seeded, active, or resolved")
+        return v
+
+    @field_validator("sceneId", "locationId")
+    @classmethod
+    def validate_optional_ids(cls, v: Optional[str], info) -> Optional[str]:
+        if v is None or not str(v).strip():
+            return None
+        return _require_safe_identifier(str(v).strip(), label=f"encounter.{info.field_name}")
+
+    @field_validator("pressure")
+    @classmethod
+    def validate_pressure(cls, v: str) -> str:
+        if v not in {"low", "medium", "high"}:
+            raise ValueError("encounter.pressure must be low, medium, or high")
+        return v
+
+    @field_validator("suggestedToolIds")
+    @classmethod
+    def validate_tool_ids(cls, v: list[str]) -> list[str]:
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for idx, raw in enumerate(v or []):
+            item = _require_safe_identifier(str(raw).strip(), label=f"encounter.suggestedToolIds[{idx}]")
+            if item in seen:
+                continue
+            seen.add(item)
+            cleaned.append(item)
+        return cleaned
+
+
+class LocationSeed(StructuredSeedBase):
+    kind: str = "site"
+    status: str = "seeded"
+    summary: str = ""
+    region: str = ""
+    parentLocationId: Optional[str] = None
+    sceneIds: list[str] = Field(default_factory=list)
+
+    @field_validator("kind")
+    @classmethod
+    def validate_kind(cls, v: str) -> str:
+        allowed = {"inn", "district", "station", "ruin", "wilderness", "settlement", "site"}
+        if v not in allowed:
+            raise ValueError(f"location.kind must be one of {sorted(allowed)}")
+        return v
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v: str) -> str:
+        if v not in {"seeded", "active", "resolved"}:
+            raise ValueError("location.status must be seeded, active, or resolved")
+        return v
+
+    @field_validator("parentLocationId")
+    @classmethod
+    def validate_parent_location_id(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or not str(v).strip():
+            return None
+        return _require_safe_identifier(str(v).strip(), label="location.parentLocationId")
+
+    @field_validator("sceneIds")
+    @classmethod
+    def validate_scene_ids(cls, v: list[str]) -> list[str]:
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for idx, raw in enumerate(v or []):
+            item = _require_safe_identifier(str(raw).strip(), label=f"location.sceneIds[{idx}]")
+            if item in seen:
+                continue
+            seen.add(item)
+            cleaned.append(item)
+        return cleaned
+
+
+class ClockSeed(StructuredSeedBase):
+    status: str = "seeded"
+    segments: int = 4
+    progress: int = 0
+    trigger: str = ""
+    consequence: str = ""
+    sceneId: Optional[str] = None
+    locationId: Optional[str] = None
+    factionIds: list[str] = Field(default_factory=list)
+    linkedSceneIds: list[str] = Field(default_factory=list)
+    linkedEncounterIds: list[str] = Field(default_factory=list)
+    publicVisible: bool = False
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v: str) -> str:
+        if v not in {"seeded", "active", "resolved"}:
+            raise ValueError("clock.status must be seeded, active, or resolved")
+        return v
+
+    @field_validator("segments")
+    @classmethod
+    def validate_segments(cls, v: int) -> int:
+        if v < 1 or v > 24:
+            raise ValueError("clock.segments must be between 1 and 24")
+        return v
+
+    @field_validator("progress")
+    @classmethod
+    def validate_progress(cls, v: int) -> int:
+        if v < 0:
+            raise ValueError("clock.progress must be >= 0")
+        return v
+
+    @field_validator("sceneId", "locationId")
+    @classmethod
+    def validate_optional_ids(cls, v: Optional[str], info) -> Optional[str]:
+        if v is None or not str(v).strip():
+            return None
+        return _require_safe_identifier(str(v).strip(), label=f"clock.{info.field_name}")
+
+    @field_validator("factionIds", "linkedSceneIds", "linkedEncounterIds")
+    @classmethod
+    def validate_linked_id_lists(cls, v: list[str], info) -> list[str]:
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for idx, raw in enumerate(v or []):
+            item = _require_safe_identifier(str(raw).strip(), label=f"clock.{info.field_name}[{idx}]")
+            if item in seen:
+                continue
+            seen.add(item)
+            cleaned.append(item)
+        return cleaned
+
+    @model_validator(mode="after")
+    def validate_progress_within_segments(self):
+        if self.progress > self.segments:
+            raise ValueError("clock.progress must not exceed clock.segments")
+        return self
+
+
+class FactionPresence(BaseModel):
+    locationId: str
+    strength: str = "hidden"
+    details: str = ""
+
+    @field_validator("locationId")
+    @classmethod
+    def validate_location_id(cls, v: str) -> str:
+        return _require_safe_identifier(v, label="factionPresence.locationId")
+
+    @field_validator("strength")
+    @classmethod
+    def validate_strength(cls, v: str) -> str:
+        if v not in {"hidden", "weak", "present", "strong", "dominant"}:
+            raise ValueError("factionPresence.strength must be hidden, weak, present, strong, or dominant")
+        return v
+
+
+class FactionSeed(StructuredSeedBase):
+    tier: str = "local"
+    factionType: str = "political"
+    presence: list[FactionPresence] = Field(default_factory=list)
+    agenda: str = ""
+    resources: list[str] = Field(default_factory=list)
+    rivalIds: list[str] = Field(default_factory=list)
+    allyIds: list[str] = Field(default_factory=list)
+    clockIds: list[str] = Field(default_factory=list)
+    sceneIds: list[str] = Field(default_factory=list)
+    leaderName: Optional[str] = None
+    headquartersLocationId: Optional[str] = None
+
+    @field_validator("tier")
+    @classmethod
+    def validate_tier(cls, v: str) -> str:
+        if v not in {"local", "regional", "global", "planar", "cosmic"}:
+            raise ValueError("faction.tier must be local, regional, global, planar, or cosmic")
+        return v
+
+    @field_validator("factionType")
+    @classmethod
+    def validate_faction_type(cls, v: str) -> str:
+        allowed_types = {"political", "criminal", "economic", "mystical", "military", "guild", "mercantile", "religious", "nomadic", "hermetic"}
+        if v not in allowed_types:
+            raise ValueError(f"faction.factionType must be one of {sorted(allowed_types)}")
+        return v
+
+    @field_validator("rivalIds", "allyIds", "clockIds", "sceneIds")
+    @classmethod
+    def validate_linked_lists(cls, v: list[str], info) -> list[str]:
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for idx, raw in enumerate(v or []):
+            item = _require_safe_identifier(str(raw).strip(), label=f"faction.{info.field_name}[{idx}]")
+            if item in seen:
+                continue
+            seen.add(item)
+            cleaned.append(item)
+        return cleaned
+
+    @field_validator("leaderName")
+    @classmethod
+    def validate_leader_name(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or not str(v).strip():
+            return None
+        return str(v).strip()
+
+    @field_validator("headquartersLocationId")
+    @classmethod
+    def validate_headquarters(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or not str(v).strip():
+            return None
+        return _require_safe_identifier(str(v).strip(), label="faction.headquartersLocationId")
+
+
+class HookTarget(BaseModel):
+    targetType: str
+    targetId: str
+    weight: float = 1.0
+
+    @field_validator("targetType")
+    @classmethod
+    def validate_target_type(cls, v: str) -> str:
+        allowed = {"scene", "location", "encounter", "faction", "npc", "any"}
+        if v not in allowed:
+            raise ValueError(f"hookTarget.targetType must be one of {sorted(allowed)}")
+        return v
+
+    @field_validator("targetId")
+    @classmethod
+    def validate_target_id(cls, v: str) -> str:
+        return _require_safe_identifier(v, label="hookTarget.targetId")
+
+    @field_validator("weight")
+    @classmethod
+    def validate_weight(cls, v: float) -> float:
+        if v < 0.0 or v > 10.0:
+            raise ValueError("hookTarget.weight must be between 0.0 and 10.0")
+        return v
+
+
+class HookSeed(StructuredSeedBase):
+    hookKind: str = "rumor"
+    triggerCondition: str = "always"
+    content: str = ""
+    targets: list[HookTarget] = Field(default_factory=list)
+    expirationClockId: Optional[str] = None
+    expirationCondition: str = ""
+    used: bool = False
+    hidden: bool = True
+    gmNotes: str = ""
+    suggestedChecks: list[str] = Field(default_factory=list)
+
+    @field_validator("hookKind")
+    @classmethod
+    def validate_hook_kind(cls, v: str) -> str:
+        allowed = {"rumor", "event", "discovery", "threat", "opportunity", "mystery", "task", "vision"}
+        if v not in allowed:
+            raise ValueError(f"hook.hookKind must be one of {sorted(allowed)}")
+        return v
+
+    @field_validator("triggerCondition")
+    @classmethod
+    def validate_trigger(cls, v: str) -> str:
+        if not isinstance(v, str):
+            raise ValueError("hook.triggerCondition must be a string")
+        return v.strip()
+
+    @field_validator("expirationClockId")
+    @classmethod
+    def validate_expiration_clock(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or not str(v).strip():
+            return None
+        return _require_safe_identifier(str(v).strip(), label="hook.expirationClockId")
+
+
+class ModuleSlotProvision(BaseModel):
+    slot: str
+    entityType: str
+    entityId: str
+    policy: str = "exclusive"
+
+    @field_validator("slot")
+    @classmethod
+    def validate_slot(cls, v: str) -> str:
+        allowed = {
+            "opening_scene",
+            "default_location",
+            "starter_encounter",
+            "starter_clock",
+            "primary_cast",
+            "fallback_referee_frame",
+        }
+        if v not in allowed:
+            raise ValueError(f"module.providesSlots.slot must be one of {sorted(allowed)}")
+        return v
+
+    @field_validator("entityType")
+    @classmethod
+    def validate_entity_type(cls, v: str) -> str:
+        allowed = {"scene", "encounter", "location", "clock", "cast_group", "faction"}
+        if v not in allowed:
+            raise ValueError(f"module.providesSlots.entityType must be one of {sorted(allowed)}")
+        return v
+
+    @field_validator("entityId")
+    @classmethod
+    def validate_entity_id(cls, v: str) -> str:
+        return _require_safe_identifier(v, label="module.providesSlots.entityId")
+
+    @field_validator("policy")
+    @classmethod
+    def validate_policy(cls, v: str) -> str:
+        if v not in {"exclusive", "append", "replace"}:
+            raise ValueError("module.providesSlots.policy must be exclusive, append, or replace")
+        return v
+
+
+class RuntimeSlotBinding(BaseModel):
+    slot: str
+    entityType: str
+    entityId: str
+    providerModuleId: str
+
+    @field_validator("slot")
+    @classmethod
+    def validate_slot(cls, v: str) -> str:
+        allowed = {
+            "opening_scene",
+            "default_location",
+            "starter_encounter",
+            "starter_clock",
+            "primary_cast",
+            "fallback_referee_frame",
+        }
+        if v not in allowed:
+            raise ValueError(f"runtime_settings.slotBindings.slot must be one of {sorted(allowed)}")
+        return v
+
+    @field_validator("entityType")
+    @classmethod
+    def validate_entity_type(cls, v: str) -> str:
+        allowed = {"scene", "encounter", "location", "clock", "cast_group", "faction"}
+        if v not in allowed:
+            raise ValueError(f"runtime_settings.slotBindings.entityType must be one of {sorted(allowed)}")
+        return v
+
+    @field_validator("entityId")
+    @classmethod
+    def validate_entity_id(cls, v: str) -> str:
+        return _require_safe_identifier(v, label="runtime_settings.slotBindings.entityId")
+
+    @field_validator("providerModuleId")
+    @classmethod
+    def validate_provider_module_id(cls, v: str) -> str:
+        return _require_safe_identifier(v, label="runtime_settings.slotBindings.providerModuleId")
+
+
 class ModuleLibraryEntry(BaseModel):
     id: str
     name: str
@@ -798,6 +1296,16 @@ class ModuleLibraryEntry(BaseModel):
     subagentGroups: list[SubagentGroup] = Field(default_factory=list)
     starterArtifacts: list[ModuleStarterArtifactRef] = Field(default_factory=list)
     runtimeContext: list[dict[str, str]] = Field(default_factory=list)
+    moduleDependencies: list[str] = Field(default_factory=list)
+    moduleConflicts: list[str] = Field(default_factory=list)
+    requiresSlots: list[str] = Field(default_factory=list)
+    providesSlots: list[ModuleSlotProvision] = Field(default_factory=list)
+    sceneSeeds: list[SceneSeed] = Field(default_factory=list)
+    encounterSeeds: list[EncounterSeed] = Field(default_factory=list)
+    locationSeeds: list[LocationSeed] = Field(default_factory=list)
+    clockSeeds: list[ClockSeed] = Field(default_factory=list)
+    factionSeeds: list[FactionSeed] = Field(default_factory=list)
+    hookSeeds: list[HookSeed] = Field(default_factory=list)
 
     @field_validator("id", "name")
     @classmethod
@@ -814,7 +1322,7 @@ class ModuleLibraryEntry(BaseModel):
     @field_validator("category")
     @classmethod
     def validate_category(cls, v: str) -> str:
-        allowed = {"world", "rules", "persona", "party", "utility", "mixed"}
+        allowed = {"world", "rules", "persona", "party", "utility", "adventure", "mixed"}
         return v if v in allowed else "mixed"
 
     @field_validator("tags")
@@ -873,6 +1381,44 @@ class ModuleLibraryEntry(BaseModel):
     def validate_origin(cls, v: str) -> str:
         return "artifact" if v == "artifact" else "workspace"
 
+    @field_validator("moduleDependencies", "moduleConflicts")
+    @classmethod
+    def validate_module_refs(cls, v: list[str], info) -> list[str]:
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for idx, raw in enumerate(v or []):
+            item = _require_safe_identifier(str(raw).strip(), label=f"module.{info.field_name}[{idx}]")
+            if item in seen:
+                continue
+            seen.add(item)
+            cleaned.append(item)
+        return cleaned
+
+    @field_validator("requiresSlots")
+    @classmethod
+    def validate_required_slots(cls, v: list[str]) -> list[str]:
+        allowed = {
+            "opening_scene",
+            "default_location",
+            "starter_encounter",
+            "starter_clock",
+            "primary_cast",
+            "fallback_referee_frame",
+        }
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for idx, raw in enumerate(v or []):
+            item = str(raw or "").strip()
+            if not item:
+                continue
+            if item not in allowed:
+                raise ValueError(f"module.requiresSlots[{idx}] must be one of {sorted(allowed)}")
+            if item in seen:
+                continue
+            seen.add(item)
+            cleaned.append(item)
+        return cleaned
+
     @field_validator("runtimeContext")
     @classmethod
     def validate_runtime_context(cls, v: list[dict[str, str]]) -> list[dict[str, str]]:
@@ -888,6 +1434,29 @@ class ModuleLibraryEntry(BaseModel):
             cleaned.append({'key': key, 'value': value})
         return cleaned
 
+    @model_validator(mode="after")
+    def validate_structured_module_refs(self):
+        if set(self.moduleDependencies).intersection(self.moduleConflicts):
+            raise ValueError("moduleDependencies and moduleConflicts must not overlap")
+        entity_ids = {
+            "scene": {item.id for item in self.sceneSeeds},
+            "encounter": {item.id for item in self.encounterSeeds},
+            "location": {item.id for item in self.locationSeeds},
+            "clock": {item.id for item in self.clockSeeds},
+            "cast_group": {item.name for item in self.subagentGroups},
+            "faction": {item.id for item in self.factionSeeds},
+        }
+        seen_slots: set[tuple[str, str, str]] = set()
+        for provision in self.providesSlots:
+            key = (provision.slot, provision.entityType, provision.entityId)
+            if key in seen_slots:
+                raise ValueError(f"module.providesSlots contains duplicate binding {key}")
+            seen_slots.add(key)
+            if provision.entityId not in entity_ids.get(provision.entityType, set()):
+                raise ValueError(
+                    f"module.providesSlots references missing {provision.entityType} '{provision.entityId}' in module '{self.id}'"
+                )
+        return self
 
 
 class RuntimeSettings(BaseModel):
@@ -905,6 +1474,13 @@ class RuntimeSettings(BaseModel):
     loadedModuleIds: list[str] = Field(default_factory=list)
     runtimeContext: list[dict[str, str]] = Field(default_factory=list)
     shellExecutionEnabled: bool = False
+    sceneSeeds: list[SceneSeed] = Field(default_factory=list)
+    encounterSeeds: list[EncounterSeed] = Field(default_factory=list)
+    locationSeeds: list[LocationSeed] = Field(default_factory=list)
+    clockSeeds: list[ClockSeed] = Field(default_factory=list)
+    factionSeeds: list[FactionSeed] = Field(default_factory=list)
+    hookSeeds: list[HookSeed] = Field(default_factory=list)
+    slotBindings: list[RuntimeSlotBinding] = Field(default_factory=list)
 
     @field_validator("recursionLimit")
     @classmethod
@@ -951,6 +1527,7 @@ class RuntimeSettings(BaseModel):
             seen.add(module_id)
             cleaned.append(module_id)
         return cleaned
+
 
     @field_validator("runtimeContext")
     @classmethod
@@ -1138,4 +1715,195 @@ class GraphPayload(BaseModel):
                 else:
                     raise ValueError(f"[bridge_editor_package_only] Wrapper reference '{target_subgraph}' is editor/package-only in this build and cannot compile/run yet")
 
+        return self
+
+
+class ObsidianRuntimeContextPatch(BaseModel):
+    key: str
+    value: str
+    mergePolicy: str = "replace"
+
+    @field_validator("key")
+    @classmethod
+    def validate_key(cls, v: str) -> str:
+        return _require_safe_identifier(v, label="obsidian.runtimeContext.key")
+
+    @field_validator("value")
+    @classmethod
+    def validate_value(cls, v: str) -> str:
+        if not isinstance(v, str):
+            raise ValueError("obsidian.runtimeContext.value must be a string")
+        if any(ch in v for ch in ("\x00", "\r")):
+            raise ValueError("obsidian.runtimeContext.value contains unsupported control characters")
+        return v
+
+    @field_validator("mergePolicy")
+    @classmethod
+    def validate_merge_policy(cls, v: str) -> str:
+        if v not in {"error", "preserve", "replace"}:
+            raise ValueError("obsidian.mergePolicy must be error, preserve, or replace")
+        return v
+
+
+class ObsidianScenePatch(BaseModel):
+    sceneId: str
+    status: Optional[str] = None
+    objective: Optional[str] = None
+    situation: Optional[str] = None
+    mergePolicy: str = "replace"
+
+    @field_validator("sceneId")
+    @classmethod
+    def validate_scene_id(cls, v: str) -> str:
+        return _require_safe_identifier(v, label="obsidian.scenePatch.sceneId")
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        if v not in {"seeded", "active", "resolved"}:
+            raise ValueError("obsidian.scenePatch.status must be seeded, active, or resolved")
+        return v
+
+    @field_validator("mergePolicy")
+    @classmethod
+    def validate_merge_policy(cls, v: str) -> str:
+        if v not in {"error", "preserve", "replace"}:
+            raise ValueError("obsidian.scenePatch.mergePolicy must be error, preserve, or replace")
+        return v
+
+
+class ObsidianClockPatch(BaseModel):
+    clockId: str
+    status: Optional[str] = None
+    progress: Optional[int] = None
+    trigger: Optional[str] = None
+    consequence: Optional[str] = None
+    mergePolicy: str = "replace"
+
+    @field_validator("clockId")
+    @classmethod
+    def validate_clock_id(cls, v: str) -> str:
+        return _require_safe_identifier(v, label="obsidian.clockPatch.clockId")
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        if v not in {"seeded", "active", "resolved"}:
+            raise ValueError("obsidian.clockPatch.status must be seeded, active, or resolved")
+        return v
+
+    @field_validator("progress")
+    @classmethod
+    def validate_progress(cls, v: Optional[int]) -> Optional[int]:
+        if v is None:
+            return None
+        if v < 0:
+            raise ValueError("obsidian.clockPatch.progress must be >= 0")
+        return v
+
+    @field_validator("mergePolicy")
+    @classmethod
+    def validate_merge_policy(cls, v: str) -> str:
+        if v not in {"error", "preserve", "replace"}:
+            raise ValueError("obsidian.clockPatch.mergePolicy must be error, preserve, or replace")
+        return v
+
+
+class ObsidianFactionPatch(BaseModel):
+    factionId: str
+    agenda: Optional[str] = None
+    leaderName: Optional[str] = None
+    resources: Optional[list[str]] = None
+    mergePolicy: str = "replace"
+
+    @field_validator("factionId")
+    @classmethod
+    def validate_faction_id(cls, v: str) -> str:
+        return _require_safe_identifier(v, label="obsidian.factionPatch.factionId")
+
+    @field_validator("resources")
+    @classmethod
+    def validate_resources(cls, v: Optional[list[str]]) -> Optional[list[str]]:
+        if v is None:
+            return None
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for raw in v:
+            item = str(raw).strip()
+            if not item or item in seen:
+                continue
+            seen.add(item)
+            cleaned.append(item)
+        return cleaned
+
+    @field_validator("mergePolicy")
+    @classmethod
+    def validate_merge_policy(cls, v: str) -> str:
+        if v not in {"error", "preserve", "replace"}:
+            raise ValueError("obsidian.factionPatch.mergePolicy must be error, preserve, or replace")
+        return v
+
+
+class ObsidianHookPatch(BaseModel):
+    hookId: str
+    used: Optional[bool] = None
+    hidden: Optional[bool] = None
+    gmNotes: Optional[str] = None
+    content: Optional[str] = None
+    mergePolicy: str = "replace"
+
+    @field_validator("hookId")
+    @classmethod
+    def validate_hook_id(cls, v: str) -> str:
+        return _require_safe_identifier(v, label="obsidian.hookPatch.hookId")
+
+    @field_validator("mergePolicy")
+    @classmethod
+    def validate_merge_policy(cls, v: str) -> str:
+        if v not in {"error", "preserve", "replace"}:
+            raise ValueError("obsidian.hookPatch.mergePolicy must be error, preserve, or replace")
+        return v
+
+
+class ObsidianRecapPayload(BaseModel):
+    graphId: str
+    sessionId: str = "session_current"
+    recap: str = ""
+    gmJournal: str = ""
+    validatedDecisions: list[str] = Field(default_factory=list)
+    runtimeContextUpdates: list[ObsidianRuntimeContextPatch] = Field(default_factory=list)
+    scenePatches: list[ObsidianScenePatch] = Field(default_factory=list)
+    clockPatches: list[ObsidianClockPatch] = Field(default_factory=list)
+    factionPatches: list[ObsidianFactionPatch] = Field(default_factory=list)
+    hookPatches: list[ObsidianHookPatch] = Field(default_factory=list)
+
+    @field_validator("graphId", "sessionId")
+    @classmethod
+    def validate_ids(cls, v: str, info) -> str:
+        return _require_safe_identifier(v, label=f"obsidianRecap.{info.field_name}")
+
+    @field_validator("validatedDecisions")
+    @classmethod
+    def validate_decisions(cls, v: list[str]) -> list[str]:
+        cleaned: list[str] = []
+        for raw in v or []:
+            item = str(raw).strip()
+            if item:
+                cleaned.append(item)
+        return cleaned
+
+
+class ObsidianRecapApplyRequest(BaseModel):
+    graphPayload: GraphPayload
+    recap: ObsidianRecapPayload
+    failOnConflict: bool = False
+
+    @model_validator(mode="after")
+    def validate_graph_id_alignment(self):
+        if self.graphPayload.graph_id != self.recap.graphId:
+            raise ValueError("obsidian recap graphId must match graphPayload.graph_id")
         return self

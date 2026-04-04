@@ -1,12 +1,13 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { useAppStore, type GraphBinding, type ArtifactType, type ExecutionProfile, type ModuleLibraryCategory, type ModuleLibraryEntry, type ModuleLibraryLineage, type PromptAssignmentTarget, type PromptStripAssignment, type PromptStripDefinition, type PromptStripMergeMode, type Tab } from '../store';
-import { saveArtifactManifest } from '../api/artifacts';
+import { fetchArtifactManifest, saveArtifactManifest } from '../api/artifacts';
 import { Database, Plus, Trash2, Eye, ChevronDown, ChevronRight, Workflow, Cpu, Boxes, LibraryBig, UploadCloud, Lock, LockOpen, BookOpen, Wand2, PackagePlus } from 'lucide-react';
 import CapabilityInspectorSection from './CapabilityInspectorSection';
 import { ARTIFACT_KIND_META, BLOCK_FAMILY_BADGE_CLASSES, BLOCK_FAMILY_LABELS, EXECUTION_PROFILE_META, getArtifactOptionsForEditor, getExecutionProfileOptionsForEditor, inferNodeBlockFamily, getNodeRuntimeMetaMatrix } from '../capabilities';
 import { describeToolObservationCounts, parseToolObservation, summarizeToolObservation } from '../executionTruth';
 import { deriveExecutionTimeline } from '../executionTimeline';
 import { applyModuleDefinitionToRuntimeSettings, buildModuleLibraryEntryFromRuntimeSettings, buildPromptAssignmentTargetKey, buildSurfaceTruthSummary, extractPromptStripVariables, getLocalPromptForNode, getPromptAssignmentsForTarget, isPromptCapableNodeType, resolvePromptStripsForNodeTarget, resolvePromptStripsForSubagentTarget, resolvePromptStripsForTarget } from '../store/workspace';
+import { hydrateArtifactEditorGraph } from '../store/artifactHydration';
 
 const STATE_KEY_PARAMS = [
   'output_key', 'input_key', 'state_key', 'target_key',
@@ -246,6 +247,7 @@ export default function StatePanelContent() {
     updateArtifactType,
     updateExecutionProfile,
     updateRuntimeSettings,
+    openTab,
     setIsAsync,
     nodes,
     edges,
@@ -384,6 +386,24 @@ export default function StatePanelContent() {
       ...entry,
       starterArtifacts: (entry.starterArtifacts || []).filter((_, index) => index !== artifactIndex),
     } : entry));
+  };
+
+  const openStarterArtifactRef = async (artifactKind: ArtifactType, artifactId: string) => {
+    try {
+      const manifest = await fetchArtifactManifest(artifactKind, artifactId);
+      const artifact = manifest.artifact;
+      const hydrated = hydrateArtifactEditorGraph(artifact);
+      openTab(null, artifact.name || manifest.title || 'Referenced Artifact', (hydrated.nodes as never[]) || [], (hydrated.edges as never[]) || [], artifact.customStateSchema || [], artifact.isAsync ?? true, {
+        graphBindings: artifact.graphBindings || [],
+        artifactType: (artifact.artifactType || manifest.kind) as ArtifactType,
+        executionProfile: (artifact.executionProfile || 'langgraph_async') as ExecutionProfile,
+        runtimeSettings: (artifact.runtimeSettings || {}) as never,
+        projectMode: (artifact.projectMode || activeTab?.projectMode || 'langgraph') as never,
+        scopeKind: (artifact.artifactType || manifest.kind) === 'subgraph' ? 'subgraph' : 'project',
+      });
+    } catch (err) {
+      console.error('Failed to open starter artifact ref', err);
+    }
   };
 
   const captureCurrentAssetsIntoModule = (moduleId: string) => {
@@ -1351,7 +1371,7 @@ export default function StatePanelContent() {
                     Workspace-owned <strong>bounded bundles</strong> of authoring assets. Phase 2 modules can now package <strong>prompt strips</strong>, <strong>subagent groups</strong>, <strong>runtime context</strong>, <strong>starter references</strong>, and <strong>graph/subagent prompt-assignment presets</strong>. They can also carry <strong>branch/profile metadata</strong> so main can stay generic while a future domain branch (for example a tabletop RPG demo) adds overlays without forking the runtime model. Loading still merges assets additively into the current workspace and materializes only the module&apos;s bounded prompt presets for the active tab. This is <strong>not yet</strong> a general plugin system, a separate runtime, or artifact/module publishing.
                   </div>
                   <div className="rounded-lg border border-panel-border bg-black/10 px-2 py-1.5 text-[10px] text-slate-500 leading-5">
-                    Current load semantics stay explicit and non-destructive: loading a module merges missing assets into the workspace and records that the module was loaded once for this workspace. Starter references are descriptive only in phase 2: they help modules point to recommended artifacts or scenario starters, but they do not auto-open, auto-install, or mutate the host environment. Prompt-assignment presets are limited to <strong>graph defaults</strong> and <strong>subagent targets</strong>; node-target presets remain outside this phase. Branch metadata is advisory in v94: it helps trunk and a future demo/domain branch stay retro-compatible without adding a new runtime rail.
+                    Current load semantics stay explicit and non-destructive: loading a module merges missing assets into the workspace and records that the module was loaded once for this workspace. Starter references are descriptive only in phase 2 unless the user explicitly opens one from the state panel: they still do not auto-open, auto-install, or mutate the host environment on their own. Prompt-assignment presets are limited to <strong>graph defaults</strong> and <strong>subagent targets</strong>; node-target presets remain outside this phase. Branch metadata is advisory in v94: it helps trunk and a future demo/domain branch stay retro-compatible without adding a new runtime rail.
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <button onClick={() => addModuleLibraryEntry({ promptStrips: [], promptAssignments: [], subagentGroups: [], starterArtifacts: [], runtimeContext: [] } as Partial<ModuleLibraryEntry>)} className="px-2 py-1.5 rounded-lg border border-dashed border-panel-border text-[11px] text-slate-300 hover:bg-panel-hover transition-all flex items-center gap-1">
@@ -1462,7 +1482,7 @@ export default function StatePanelContent() {
                             </div>
                             <div className="rounded-lg border border-panel-border bg-black/10 p-2 space-y-2">
                               <div className="flex items-center justify-between gap-2">
-                                <div className="text-[10px] text-slate-400">Starter references (descriptive only in phase 2)</div>
+                                <div className="text-[10px] text-slate-400">Starter references (explicit open action, still non-destructive)</div>
                                 <button onClick={() => addStarterArtifactRefToModule(entry.id)} className="px-2 py-1 rounded border border-panel-border text-[10px] text-slate-200 hover:bg-panel-hover">Ajouter un starter ref</button>
                               </div>
                               {(entry.starterArtifacts || []).length === 0 ? (
@@ -1475,7 +1495,10 @@ export default function StatePanelContent() {
                                       <input value={ref.artifactId} onChange={(e) => updateStarterArtifactRef(entry.id, refIndex, { artifactId: e.target.value })} className="col-span-4 bg-black/20 border border-panel-border rounded px-2 py-1 text-[10px] text-slate-200 outline-none focus:border-blue-500" placeholder="artifact id" />
                                       <input value={ref.label || ''} onChange={(e) => updateStarterArtifactRef(entry.id, refIndex, { label: e.target.value })} className="col-span-3 bg-black/20 border border-panel-border rounded px-2 py-1 text-[10px] text-slate-200 outline-none focus:border-blue-500" placeholder="label" />
                                       <input value={ref.description || ''} onChange={(e) => updateStarterArtifactRef(entry.id, refIndex, { description: e.target.value })} className="col-span-2 bg-black/20 border border-panel-border rounded px-2 py-1 text-[10px] text-slate-200 outline-none focus:border-blue-500" placeholder="note" />
-                                      <button type="button" onClick={() => removeStarterArtifactRef(entry.id, refIndex)} className="col-span-1 text-slate-500 hover:text-red-400"><Trash2 size={12} /></button>
+                                      <div className="col-span-1 flex items-center justify-end gap-1">
+                                        <button type="button" onClick={() => void openStarterArtifactRef((ref.artifactKind || 'graph') as ArtifactType, ref.artifactId)} className="px-1.5 py-0.5 rounded border border-emerald-500/20 bg-emerald-500/10 text-[10px] text-emerald-200 hover:bg-emerald-500/15">Open</button>
+                                        <button type="button" onClick={() => removeStarterArtifactRef(entry.id, refIndex)} className="text-slate-500 hover:text-red-400"><Trash2 size={12} /></button>
+                                      </div>
                                     </div>
                                   ))}
                                 </div>

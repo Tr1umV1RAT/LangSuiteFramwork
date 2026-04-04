@@ -164,6 +164,25 @@ export default function ArtifactLibrarySection() {
           placeholder="Filter the library..."
           className="w-full bg-black/20 border border-panel-border rounded px-2 py-1.5 text-[11px] text-white placeholder:text-slate-600 outline-none focus:border-blue-500"
         />
+        {items.some((item) => item.id === 'jdr_solo_session_starter') && activeProjectMode === 'langgraph' && (
+          <div className="rounded-lg border border-fuchsia-500/20 bg-fuchsia-500/10 px-2.5 py-2 text-[10px] leading-5 text-fuchsia-100">
+            <div>Tabletop demo: <strong>Tabletop Solo Session Starter</strong> opens on the LangGraph surface with GM, cast, packs, dice, and a rules helper.</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                onClick={() => window.dispatchEvent(new CustomEvent('langsuite:open-tabletop-starter'))}
+                className="rounded-md border border-fuchsia-500/25 bg-fuchsia-500/12 px-2 py-1 text-[10px] font-medium text-fuchsia-50 hover:bg-fuchsia-500/18 transition-all"
+              >
+                Guided setup
+              </button>
+              <button
+                onClick={() => void openArtifact('graph', 'jdr_solo_session_starter')}
+                className="rounded-md border border-panel-border bg-black/20 px-2 py-1 text-[10px] text-slate-100 hover:bg-panel-hover transition-all"
+              >
+                Open starter
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="px-3 pb-3 space-y-3 overflow-auto max-h-[340px] scrollbar-thin">

@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '../store';
 import { ARTIFACT_KIND_META, EXECUTION_PROFILE_META, PROJECT_MODE_META, type ProjectMode } from '../capabilities';
-import { X, Plus } from 'lucide-react';
+import { X, Plus, Sparkles } from 'lucide-react';
+import { getTabletopVisualProfile } from '../jdr/theme';
 
 function colorFromScope(scopePath: string): string {
   let hash = 0;
@@ -108,6 +109,7 @@ export default function TabBar() {
           `mode=${tab.projectMode}`,
           `profile=${profileBadge.label}`,
         ];
+        const tabletopProfile = getTabletopVisualProfile(tab.runtimeSettings);
         if (tab.projectId) titleLines.push(`project_id=${tab.projectId}`);
 
         return (
@@ -155,6 +157,12 @@ export default function TabBar() {
                 <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide ${profileBadge.className}`}>
                   {profileBadge.label}
                 </span>
+                {tabletopProfile.isTabletop && (
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide inline-flex items-center gap-1 ${tabletopProfile.variant === 'space' ? 'bg-sky-500/15 text-sky-200' : tabletopProfile.variant === 'noir' ? 'bg-violet-500/15 text-violet-200' : 'bg-fuchsia-500/15 text-fuchsia-100'}`}>
+                    <Sparkles size={10} />
+                    tt
+                  </span>
+                )}
               </div>
             )}
 

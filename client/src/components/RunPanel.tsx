@@ -147,6 +147,15 @@ function getActionableIssueHint(entry: RunLogEntry): { title: string; lines: str
       ],
     };
   }
+  if (code === 'missing_provider_config') {
+    return {
+      title: 'Choose a provider and model before running this authored session.',
+      lines: [
+        'The graph is assembled and editable, but one or more provider-backed nodes still have no provider configured.',
+        'Open the affected node/tool settings, choose a truthful provider surface, then rerun.',
+      ],
+    };
+  }
   if (code === 'missing_provider_api_base_url') {
     return {
       title: 'Set a provider base URL on the affected node or tool.',
@@ -222,6 +231,8 @@ function getActionableIssueHint(entry: RunLogEntry): { title: string; lines: str
 
 function describeValidationIssue(issue: { code?: string; message: string }): string {
   switch (issue.code) {
+    case 'missing_provider_config':
+      return 'Choose a provider/model on the affected provider-backed node before running.';
     case 'missing_api_base_url':
       return 'Add an API Base URL on the affected provider-backed node before running.';
     case 'missing_api_key_env':
@@ -528,7 +539,7 @@ export default function RunPanel() {
   const dependencySensitiveNodeCount = useMemo(() => nodes.filter((node) => { const nodeType = typeof node.data?.nodeType === 'string' ? String(node.data.nodeType) : ''; const meta = nodeType ? getNodeRuntimeMeta(nodeType) : null; return Boolean(meta?.providerBacked || meta?.toolkitBacked || meta?.configRequired); }).length, [nodes]);
   const requiresShellArming = useMemo(() => nodes.some((node) => String(node.data?.nodeType || '') === 'tool_shell_command'), [nodes]);
   const providerBlocked = validationCodes.includes('invalid_provider');
-  const providerNeedsAttention = providerBlocked || validationCodes.includes('missing_api_key_env') || validationCodes.includes('missing_api_base_url') || validationCodes.includes('provider_surface_not_supported');
+  const providerNeedsAttention = providerBlocked || validationCodes.includes('missing_provider_config') || validationCodes.includes('missing_api_key_env') || validationCodes.includes('missing_api_base_url') || validationCodes.includes('provider_surface_not_supported');
   const likelyBlockers = useMemo(() => validation.issues.filter((issue) => issue.severity !== 'info').slice(0, 4).map((issue) => ({ id: `${issue.code || 'issue'}:${issue.nodeId || issue.message}`, text: describeValidationIssue(issue) })), [validation.issues]);
   const hasFilesystemSensitiveNodes = useMemo(() => nodes.some((node) => FILESYSTEM_SENSITIVE_NODE_TYPES.has(String(node.data?.nodeType || ''))), [nodes]);
   const hasRequestsSensitiveNodes = useMemo(() => nodes.some((node) => REQUESTS_SENSITIVE_NODE_TYPES.has(String(node.data?.nodeType || ''))), [nodes]);
@@ -589,8 +600,8 @@ export default function RunPanel() {
     {
       label: 'Provider configuration',
       tone: providerSensitiveNodeCount === 0 ? 'info' as const : providerNeedsAttention ? (providerBlocked ? 'blocked' as const : 'attention' as const) : 'ready' as const,
-      value: providerSensitiveNodeCount === 0 ? 'not needed' : providerNeedsAttention ? 'needs review' : 'looks configured',
-      help: providerSensitiveNodeCount === 0 ? 'No provider-backed node is currently present in the graph.' : providerNeedsAttention ? 'The local validator found provider-related warnings or errors. Review env var, base URL, or provider surface truth before running.' : 'No provider warning is currently raised by the local validator.',
+      value: providerSensitiveNodeCount === 0 ? 'not needed' : providerNeedsAttention ? 'needs review' : 'configured',
+      help: providerSensitiveNodeCount === 0 ? 'No provider-backed node is currently present in the graph.' : providerNeedsAttention ? 'The local validator found provider-related warnings or missing-provider states. Review provider choice, env var, base URL, or provider surface truth before running.' : 'No provider warning is currently raised by the local validator.',
     },
     {
       label: 'Dependencies / env',

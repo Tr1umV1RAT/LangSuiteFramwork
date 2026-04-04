@@ -9,6 +9,7 @@ from api.routes import router as compile_router
 from api.collaboration import router as collab_router
 from api.runner import router as runner_router
 from api.artifacts import router as artifacts_router
+from api.obsidian import router as obsidian_router
 from core.artifact_registry import bootstrap_builtin_manifests
 import db
 
@@ -37,6 +38,7 @@ app.include_router(compile_router)
 app.include_router(collab_router)
 app.include_router(runner_router)
 app.include_router(artifacts_router)
+app.include_router(obsidian_router)
 
 STATIC_DIR = Path(__file__).parent / "static"
 
