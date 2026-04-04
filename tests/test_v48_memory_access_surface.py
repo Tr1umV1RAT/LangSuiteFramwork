@@ -40,7 +40,7 @@ def test_memory_access_ui_surfaces_show_preferred_and_runtime_access() -> None:
     inspector_text = INSPECTOR.read_text(encoding="utf-8")
     state_panel_text = STATE_PANEL.read_text(encoding="utf-8")
     assert 'Preferred memory surface:' in inspector_text
-    assert 'Canonical bounded memory access surface' in inspector_text
+    assert 'Canonical bounded runtime-store access surface' in inspector_text
     assert 'Surface conseillée:' in state_panel_text
 
 

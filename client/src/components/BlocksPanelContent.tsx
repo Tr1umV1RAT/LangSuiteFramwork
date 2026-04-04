@@ -4,6 +4,7 @@ import { ChevronDown, ChevronRight, LayoutGrid, Filter, Shapes, Sparkles, Librar
 import ArtifactLibrarySection from './artifacts/ArtifactLibrarySection';
 import { useAppStore } from '../store';
 import { getNodeRuntimeMeta, getNodeCapabilityInfo, inferNodeMaturity, isNodeCompatibleWithSurface, isNodeBackedByRuntime, isNodePaletteHiddenByPolicy, BLOCK_FAMILY_BADGE_CLASSES, BLOCK_FAMILY_LABELS, KIND_BADGE_CLASSES, ORIGIN_BADGE_CLASSES, KIND_LABELS, ORIGIN_LABELS, KIND_ORDER, SURFACE_BADGE_CLASSES, SURFACE_LABELS, RAIL_BADGE_CLASSES, RAIL_LABELS, SUPPORT_STATUS_BADGE_CLASSES, SUPPORT_STATUS_LABELS, MATURITY_BADGE_CLASSES, MATURITY_LABELS } from '../catalog';
+import { getMemoryFirstSuccessPriority, getMemoryLaneDescription, getMemoryLaneId, getMemoryLaneLabel, isCanonicalFirstSuccessMemorySurface } from '../memorySurfaceLabels';
 
 const SIMPLE_QUICK_START = ['user_input_node', 'llm_chat', 'tool_web_search', 'chat_output', 'debug_print'] as const;
 const QUICK_INSERT_HELP: Record<string, string> = {
@@ -29,7 +30,7 @@ const QUICK_INSERT_HELP: Record<string, string> = {
 const PRESET_HELP: Record<'minimal' | 'graph' | 'memory_rag' | 'advanced' | 'debug', string> = {
   minimal: 'Le strict utile pour démarrer sans bruit.',
   graph: 'Mise en avant du flux principal : entrée, logique, LLM, sortie.',
-  memory_rag: 'Pousse mémoire, recherche, documents et récupération.',
+  memory_rag: 'Centre le tri sur les trois lanes mémoire réellement distinctes du build actuel : checkpointing, runtime store canonical, puis local RAG / embeddings. Les helpers legacy restent masqués par défaut.',
   advanced: 'Montre toute la bibliothèque sans filtre fort.',
   debug: 'Favorise inspection, logique et blocs de test.',
 };
@@ -165,7 +166,24 @@ export default function BlocksPanelContent() {
     const base = [...allNodeDefs]
       .filter((def) => showIncompatibleBlocks || isNodeCompatibleWithSurface(def.type, { artifactType, executionProfile, projectMode }))
       .filter((def) => matchesPalettePreset(def, palettePreset))
-      .filter((def) => paletteMode === 'all' || (paletteMode === 'common' && (COMMON_NODE_TYPES.has(def.type) || matchesPalettePreset(def, 'minimal'))) || (paletteMode === 'quickstart' && SIMPLE_QUICK_START.includes(def.type as typeof SIMPLE_QUICK_START[number])))
+      .filter((def) => {
+        if (paletteMode === 'all') return true;
+        if (paletteMode === 'common') {
+          return COMMON_NODE_TYPES.has(def.type) || matchesPalettePreset(def, 'minimal');
+        }
+        if (paletteMode === 'quickstart') {
+          const meta = getNodeRuntimeMeta(def.type);
+          return SIMPLE_QUICK_START.includes(def.type as typeof SIMPLE_QUICK_START[number])
+            || (palettePreset === 'memory_rag' && isCanonicalFirstSuccessMemorySurface(def.type, {
+              memorySystemKind: typeof meta.memorySystemKind === 'string' ? meta.memorySystemKind : null,
+              memoryAccessModel: typeof meta.memoryAccessModel === 'string' ? meta.memoryAccessModel : null,
+              memoryRole: typeof meta.memoryRole === 'string' ? meta.memoryRole : null,
+              legacyHelperSurface: Boolean(meta.legacyHelperSurface),
+              memoryConsumer: Boolean(meta.memoryConsumer),
+            }));
+        }
+        return true;
+      })
       .filter((def) => {
         const meta = getNodeRuntimeMeta(def.type);
         if (showLegacyMemoryHelpers) return true;
@@ -175,6 +193,30 @@ export default function BlocksPanelContent() {
         const aCompat = isNodeCompatibleWithSurface(a.type, { artifactType, executionProfile, projectMode }) ? 1 : 0;
         const bCompat = isNodeCompatibleWithSurface(b.type, { artifactType, executionProfile, projectMode }) ? 1 : 0;
         if (aCompat !== bCompat) return bCompat - aCompat;
+        if (palettePreset === 'memory_rag') {
+          const aMeta = getNodeRuntimeMeta(a.type);
+          const bMeta = getNodeRuntimeMeta(b.type);
+          const aIsMemory = a.category === 'Memory';
+          const bIsMemory = b.category === 'Memory';
+          if (aIsMemory !== bIsMemory) return aIsMemory ? -1 : 1;
+          if (aIsMemory && bIsMemory) {
+            const aPriority = getMemoryFirstSuccessPriority(a.type, {
+              memorySystemKind: typeof aMeta.memorySystemKind === 'string' ? aMeta.memorySystemKind : null,
+              memoryAccessModel: typeof aMeta.memoryAccessModel === 'string' ? aMeta.memoryAccessModel : null,
+              memoryRole: typeof aMeta.memoryRole === 'string' ? aMeta.memoryRole : null,
+              legacyHelperSurface: Boolean(aMeta.legacyHelperSurface),
+              memoryConsumer: Boolean(aMeta.memoryConsumer),
+            });
+            const bPriority = getMemoryFirstSuccessPriority(b.type, {
+              memorySystemKind: typeof bMeta.memorySystemKind === 'string' ? bMeta.memorySystemKind : null,
+              memoryAccessModel: typeof bMeta.memoryAccessModel === 'string' ? bMeta.memoryAccessModel : null,
+              memoryRole: typeof bMeta.memoryRole === 'string' ? bMeta.memoryRole : null,
+              legacyHelperSurface: Boolean(bMeta.legacyHelperSurface),
+              memoryConsumer: Boolean(bMeta.memoryConsumer),
+            });
+            if (aPriority != bPriority) return aPriority - bPriority;
+          }
+        }
         return a.label.localeCompare(b.label);
       });
 
@@ -234,7 +276,7 @@ export default function BlocksPanelContent() {
               <div className="space-y-1">
                 <div className="text-[11px] font-medium text-amber-200">Helpers mémoire legacy masqués par défaut</div>
                 <div className="text-[10px] leading-5 text-slate-400">
-                  Pour éviter de noyer l’utilisateur dans des surfaces mémoire qui se recouvrent, les helpers legacy sont cachés tant que tu n’ouvres pas explicitement cette couche. La surface recommandée est <code>memory_access</code> pour la lecture et <code>store_put</code> pour l’écriture bornée.
+                  Pour éviter de noyer l’utilisateur dans des surfaces mémoire qui se recouvrent, les helpers legacy sont cachés tant que tu n’ouvres pas explicitement cette couche. La surface recommandée est <code>memory_access</code> pour la lecture et <code>store_put</code> pour l’écriture bornée. <strong className="text-slate-300">Checkpointing</strong>, <strong className="text-slate-300">runtime store</strong>, et <strong className="text-slate-300">local RAG/vector retrieval</strong> restent trois couches différentes : ne les lis pas comme une seule « mémoire » magique.
                 </div>
               </div>
               <button
@@ -299,8 +341,24 @@ export default function BlocksPanelContent() {
                     <option value="advanced">Avancé</option>
                   </select>
                 </label>
-                <p className="text-[10px] leading-5 text-slate-500 pr-1">{paletteMode === 'quickstart' ? 'Le preset affine surtout les vues Common et All.' : PRESET_HELP[palettePreset]}</p>
+                <p className="text-[10px] leading-5 text-slate-500 pr-1">{paletteMode === 'quickstart' ? 'Le preset affine surtout les vues Common et All. En mode Mémoire / RAG, Quickstart garde aussi les surfaces canoniques de première réussite.' : PRESET_HELP[palettePreset]}</p>
               </div>
+
+              {palettePreset === 'memory_rag' && (
+                <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 px-2.5 py-2 text-[10px] text-slate-400 leading-5" data-testid="memory-rag-first-success-note">
+                  <div className="text-[10px] uppercase tracking-wide text-cyan-300 mb-1">Memory first-success path</div>
+                  <div>
+                    Commence par <strong className="text-slate-200">Checkpoint Marker</strong>, puis <strong className="text-slate-200">Memory Access</strong>, ensuite <strong className="text-slate-200">Store Put</strong>, puis <strong className="text-slate-200">Local RAG Retrieval</strong> si tu as besoin d'un index vectoriel avec embeddings.
+                  </div>
+                  <div className="mt-1">
+                    <span className="text-slate-500">Lanes :</span>{' '}
+                    <span className="text-slate-300">{getMemoryLaneLabel(getMemoryLaneId('memory_checkpoint'))}</span>,{' '}
+                    <span className="text-slate-300">{getMemoryLaneLabel(getMemoryLaneId('memory_access'))}</span>,{' '}
+                    <span className="text-slate-300">{getMemoryLaneLabel(getMemoryLaneId('rag_retriever_local'))}</span>.
+                  </div>
+                  <div className="mt-1">Les helpers legacy restent cachés tant que tu ne demandes pas explicitement à les voir.</div>
+                </div>
+              )}
 
               <div className="space-y-1.5">
                 <div className="text-[10px] uppercase tracking-wide text-slate-500">Compatibilité</div>

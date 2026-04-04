@@ -55,8 +55,8 @@ def test_memory_ui_surfaces_show_role_and_access_model() -> None:
     assert 'Memory access model:' in inspector_text
     assert 'access_model' in debug_panel_text
     assert 'memoryAccessModel' in run_panel_text
-    assert "label: 'Memory Read Helper'" in node_config_text
-    assert "label: 'Memory Write Helper'" in node_config_text
+    assert "label: 'Store Read Helper'" in node_config_text
+    assert "label: 'Store Write Helper'" in node_config_text
     assert 'memoryAccessModel?: string | null;' in types_text
     assert 'entry.memoryAccessModel =' in store_text
 

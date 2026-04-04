@@ -4,6 +4,7 @@ import { useAppStore } from '../store';
 import { BLOCK_FAMILY_BADGE_CLASSES, BLOCK_FAMILY_LABELS, SUPPORT_STATUS_META, getInteroperabilityBridges, type ArtifactType, type ProjectMode } from '../capabilities';
 import { SUPPORT_STATUS_BADGE_CLASSES, SUPPORT_STATUS_LABELS, getNodeCapabilityInfo, getNodeRuntimeMeta, inferNodeMaturity, MATURITY_BADGE_CLASSES, MATURITY_LABELS, getRailBadgeClass, getRailLabel, SURFACE_BADGE_CLASSES, SURFACE_LABELS } from '../catalog';
 import { getLocalPromptForNode, getPromptAssignmentsForTarget, isPromptCapableNodeType, resolvePromptStripsForNodeTarget } from '../store/workspace';
+import { getMemoryAccessModelLabel, getMemoryLaneDescription, getMemoryLaneId, getMemoryLaneLabel, getMemoryRoleLabel, getMemorySurfaceLabel, getPreferredMemorySurfaceLabel } from '../memorySurfaceLabels';
 
 function BoolPill({ value }: { value: boolean }) {
   return (
@@ -239,25 +240,45 @@ export default function CapabilityInspectorSection() {
                   </div>
                 )}
                 {typeof meta.memoryRole === 'string' && (
-                  <div><strong className="text-slate-200">Memory role:</strong> {meta.memoryRole.replace(/_/g, ' ')}</div>
+                  <div><strong className="text-slate-200">Memory role:</strong> {getMemoryRoleLabel(meta.memoryRole)}</div>
+                )}
+                {(typeof meta.memorySystemKind === 'string' || typeof meta.memoryAccessModel === 'string' || typeof meta.memoryRole === 'string') && (
+                  <div><strong className="text-slate-200">Memory lane:</strong> {getMemoryLaneLabel(getMemoryLaneId(nodeType, {
+                    memorySystemKind: typeof meta.memorySystemKind === 'string' ? meta.memorySystemKind : null,
+                    memoryAccessModel: typeof meta.memoryAccessModel === 'string' ? meta.memoryAccessModel : null,
+                    memoryRole: typeof meta.memoryRole === 'string' ? meta.memoryRole : null,
+                    legacyHelperSurface: Boolean(meta.legacyHelperSurface),
+                    memoryConsumer: Boolean(meta.memoryConsumer),
+                  }))}</div>
                 )}
                 {typeof meta.memoryAccessModel === 'string' && (
-                  <div><strong className="text-slate-200">Memory access model:</strong> {meta.memoryAccessModel.replace(/_/g, ' ')}</div>
+                  <div><strong className="text-slate-200">Memory access model:</strong> {getMemoryAccessModelLabel(meta.memoryAccessModel)}</div>
                 )}
                 {typeof meta.toolRuntimeMemoryAccessMode === 'string' && (
                   <div><strong className="text-slate-200">Tool/runtime memory access:</strong> {meta.toolRuntimeMemoryAccessMode.replace(/_/g, ' ')}</div>
                 )}
                 {meta.preferredSurface && (
-                  <div><strong className="text-slate-200">Preferred memory surface:</strong> {meta.preferredSurface === true ? 'this node' : String(meta.preferredSurface)}</div>
+                  <div><strong className="text-slate-200">Preferred memory surface:</strong> {getPreferredMemorySurfaceLabel(meta.preferredSurface)}</div>
                 )}
                 {meta.legacyHelperSurface && typeof meta.preferredSurface === 'string' && (
                   <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-2 text-[11px] text-slate-300 leading-5">
-                    This node is still supported, but it now behaves as a <strong>legacy helper surface</strong>. Prefer <code>{String(meta.preferredSurface)}</code> when you want the clearest bounded memory access path in the current build.
+                    This node is still supported, but it now behaves as a <strong>legacy helper surface</strong>. Prefer <code>{getPreferredMemorySurfaceLabel(meta.preferredSurface)}</code> when you want the clearest bounded memory access path in the current build.
                   </div>
                 )}
                 {!meta.legacyHelperSurface && meta.preferredSurface === true && (
                   <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-2 text-[11px] text-slate-300 leading-5">
                     This is the <strong>recommended primary memory surface</strong> for this access pattern in the current build.
+                  </div>
+                )}
+                {(typeof meta.memorySystemKind === 'string' || typeof meta.memoryAccessModel === 'string' || typeof meta.memoryRole === 'string') && (
+                  <div className="rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-2 text-[11px] text-slate-300 leading-5">
+                    <strong className="text-slate-200">Memory lane story:</strong> {getMemoryLaneDescription(getMemoryLaneId(nodeType, {
+                      memorySystemKind: typeof meta.memorySystemKind === 'string' ? meta.memorySystemKind : null,
+                      memoryAccessModel: typeof meta.memoryAccessModel === 'string' ? meta.memoryAccessModel : null,
+                      memoryRole: typeof meta.memoryRole === 'string' ? meta.memoryRole : null,
+                      legacyHelperSurface: Boolean(meta.legacyHelperSurface),
+                      memoryConsumer: Boolean(meta.memoryConsumer),
+                    }))}
                   </div>
                 )}
                 {Array.isArray(meta.uiAbstractionNotes) && meta.uiAbstractionNotes.length > 0 && (
@@ -317,15 +338,26 @@ export default function CapabilityInspectorSection() {
             {selectedNode && ['memory_store_read', 'memoryreader', 'memorywriter', 'memory_access'].includes(nodeType) && (
               <div className="rounded-lg border border-panel-border bg-black/20 p-2.5 text-[11px] text-slate-300 leading-5">
                 {nodeType === 'memory_store_read'
-                  ? 'Cross-thread store/profile read. Use this for profile or long-lived store access, not for lightweight state peeks. In the current build the runtime store backing depends on the selected runtime store backend (in-memory or local SQLite).'
+                  ? 'Cross-thread runtime-store/profile read. Use this for profile or long-lived store access, not for checkpoint peeks or vector retrieval. In the current build the backing store depends on the selected runtime store backend (in-memory or local SQLite).'
                   : nodeType === 'memoryreader'
-                    ? 'Lightweight helper read surface. It currently resolves through the runtime store, so the UI must not mislabel it as a raw checkpoint peek or as arbitrary tool-driven memory search.'
+                    ? 'Legacy helper alias for a bounded runtime-store key read. It is clearer to treat it as store access, not as a raw checkpoint peek and not as vector retrieval.'
                     : nodeType === 'memory_access'
-                      ? 'Canonical bounded memory access surface. Use it when you want one explicit memory payload for downstream agents or tools without choosing early between profile lookup, store get, or store search helper variants.'
-                      : 'Lightweight helper write surface. It still writes through the runtime store, not through plain in-thread state mutation; think bounded helper alias, not magical checkpoint mutation.'}
+                      ? 'Canonical bounded runtime-store access surface. Use it when you want one explicit memory payload for downstream agents or tools without choosing early between profile lookup, store get, or store search helper variants.'
+                      : 'Legacy helper alias for a bounded runtime-store key write. It does not mutate checkpoint/thread state directly; think store helper, not magical checkpoint mutation.'}
               </div>
             )}
 
+            {selectedNode && nodeType === 'rag_retriever_local' && (
+              <div className="rounded-lg border border-panel-border bg-black/20 p-2.5 text-[11px] text-slate-300 leading-5">
+                Local RAG retrieval surface. It queries a persisted Chroma vector index with the configured embedding model. This is separate from runtime-store profile memory and separate from thread checkpointing.
+              </div>
+            )}
+
+            {selectedNode && nodeType === 'memory_checkpoint' && (
+              <div className="rounded-lg border border-panel-border bg-black/20 p-2.5 text-[11px] text-slate-300 leading-5">
+                Graph-scope checkpoint marker. It enables per-thread snapshots/checkpointer flow at compile time. It is not a store read/write node and it is not vector retrieval.
+              </div>
+            )}
 
             {selectedNode && nodeType === 'command_node' && (
               <div className="rounded-lg border border-panel-border bg-black/20 p-2.5 text-[11px] text-slate-300 leading-5">

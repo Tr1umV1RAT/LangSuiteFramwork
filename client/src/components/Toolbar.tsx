@@ -3,7 +3,9 @@ import type { LucideIcon } from 'lucide-react';
 import { type ImportDiagnostic, useAppStore } from '../store';
 import { getModeContract, projectModeAllowsCompile, projectModeAllowsRuntime } from '../capabilities';
 import SettingsShell from './SettingsShell';
-import { buildProjectPersistenceSummary } from '../store/workspace';
+import { buildProjectPersistenceSummary, buildSurfaceTruthSummary } from '../store/workspace';
+import ProjectPersistenceTruthBlock from './ProjectPersistenceTruthBlock';
+import SurfaceTruthBadges from './SurfaceTruthBadges';
 import {
   Save,
   FolderKanban,
@@ -56,20 +58,6 @@ function buildImportDetailLines(report: ImportDiagnostic): string[] {
   return lines;
 }
 
-function describeCurrentSurfaceTruth(activeTab: ReturnType<typeof useAppStore.getState>['tabs'][number] | undefined, isAsync: boolean) {
-  const projectMode = activeTab?.projectMode || 'langgraph';
-  const compileSafe = projectModeAllowsCompile(projectMode);
-  const runtimeEnabled = projectModeAllowsRuntime(projectMode);
-  const editorOnly = Boolean(getModeContract(projectMode).editorOnly) || !runtimeEnabled;
-  const artifactType = activeTab?.artifactType || 'graph';
-  const executionProfile = activeTab?.executionProfile || (isAsync ? 'langgraph_async' : 'langgraph_sync');
-  const summary = !compileSafe && editorOnly
-    ? 'Editor-only in this build.'
-    : compileSafe && editorOnly
-      ? 'Compile-capable, but in-app runtime stays disabled on this surface.'
-      : 'Compile-safe and in-app runtime-enabled on this surface.';
-  return { projectMode, compileSafe, runtimeEnabled, editorOnly, artifactType, executionProfile, summary };
-}
 
 type CompileNotice = {
   tone: 'error' | 'warning' | 'info';
@@ -158,7 +146,11 @@ export default function Toolbar() {
 
   const activeTab = tabs.find((tab) => tab.id === activeTabId);
   const shellExecutionEnabled = Boolean(activeTab?.runtimeSettings?.shellExecutionEnabled);
-  const currentSurfaceTruth = describeCurrentSurfaceTruth(activeTab, isAsync);
+  const currentSurfaceTruth = buildSurfaceTruthSummary({
+    artifactType: activeTab?.artifactType || 'graph',
+    executionProfile: activeTab?.executionProfile || (isAsync ? 'langgraph_async' : 'langgraph_sync'),
+    projectMode: activeTab?.projectMode || 'langgraph',
+  });
 
   const semanticLinkKinds = Object.entries(graphValidation?.semanticEdgeSummary || {}).filter(([kind, count]) => kind !== 'direct_flow' && count > 0);
   const graphScopeMarkerCount = graphValidation?.graphScopeMarkerIds?.size || 0;
@@ -442,17 +434,14 @@ export default function Toolbar() {
                 </button>
               </div>
               <div className="rounded-lg border border-panel-border bg-black/20 px-2.5 py-2 text-[10px] leading-5 text-slate-500">{projectPersistence.contrastSummary} Current surface: {currentSurfaceTruth.summary}</div>
-              <div className="rounded-lg border border-panel-border bg-black/20 px-2.5 py-2 text-[10px] leading-5 text-slate-400" data-testid="project-save-open-truth">
-                <div>{projectPersistence.saveEffectSummary}</div>
-                <div className="mt-1">{projectPersistence.openEffectSummary}</div>
-              </div>
+              <ProjectPersistenceTruthBlock
+                summary={projectPersistence}
+                className="text-[10px]"
+                showContrast={false}
+                testIdPrefix="project-save-open"
+              />
               <div className="rounded-lg border border-panel-border bg-black/20 px-2.5 py-2 text-[10px] leading-5 text-slate-400" data-testid="package-surface-truth">
-                <div className="flex flex-wrap gap-2">
-                  <span className={`px-1.5 py-0.5 rounded border ${currentSurfaceTruth.compileSafe ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-200' : 'border-red-500/20 bg-red-500/10 text-red-200'}`}>{currentSurfaceTruth.compileSafe ? 'compile-safe' : 'not compile-safe'}</span>
-                  <span className={`px-1.5 py-0.5 rounded border ${currentSurfaceTruth.editorOnly ? 'border-amber-500/20 bg-amber-500/10 text-amber-200' : 'border-cyan-500/20 bg-cyan-500/10 text-cyan-200'}`}>{currentSurfaceTruth.editorOnly ? 'editor-first' : 'runtime-enabled'}</span>
-                  <span className="px-1.5 py-0.5 rounded border border-panel-border text-slate-300">mode: {currentSurfaceTruth.projectMode}</span>
-                  <span className="px-1.5 py-0.5 rounded border border-panel-border text-slate-300">artifact: {currentSurfaceTruth.artifactType}</span>
-                </div>
+                <SurfaceTruthBadges surfaceTruth={currentSurfaceTruth} />
               </div>
               {packageActionConfirm && (
                 <div className={`rounded-lg border px-3 py-3 text-[11px] leading-5 ${packageActionConfirm === 'export' ? 'border-cyan-500/25 bg-cyan-500/10 text-cyan-100' : 'border-amber-500/25 bg-amber-500/10 text-amber-100'}`} data-testid="package-consequence-dialog">

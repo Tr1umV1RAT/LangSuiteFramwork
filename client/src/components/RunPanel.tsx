@@ -4,6 +4,7 @@ import { describeToolObservationCounts, parseToolObservation, summarizeToolObser
 import { deriveExecutionTimeline } from '../executionTimeline';
 import { getNodeRuntimeMeta } from '../catalog';
 import { useAppStore, type RunLogEntry } from '../store';
+import { getMemoryAccessModelLabel, getMemoryOperationLabel, getMemorySystemKindLabel, getStoreBackendLabel } from '../memorySurfaceLabels';
 import {
   ChevronDown,
   Copy,
@@ -215,6 +216,15 @@ function getActionableIssueHint(entry: RunLogEntry): { title: string; lines: str
       ],
     };
   }
+  if (code === 'runner_busy') {
+    return {
+      title: 'Wait for the active runtime session to finish or stop it before starting another one.',
+      lines: [
+        'Async branches inside one graph run are still valid here.',
+        'The current limit is about separate Run sessions sharing one backend process, not about fan-out inside a single graph.',
+      ],
+    };
+  }
   return null;
 }
 
@@ -384,8 +394,8 @@ function LogEntryCard({ entry, hoveredNodeId, lockedNodeId, onFocusNode, onHover
         {entry.executionStatus && <ToolStatusBadge status={entry.executionStatus} />}
         {isLockedMatch && <span className="px-1.5 py-0.5 rounded border text-[10px] text-violet-200 bg-violet-500/10 border-violet-500/20">locked</span>}
         {entry.reasonCode && <span className="px-1.5 py-0.5 rounded border text-[10px] text-amber-300 bg-amber-500/10 border-amber-500/20">{entry.reasonCode}</span>}
-        {entry.memorySystem && <span className="px-1.5 py-0.5 rounded border text-[10px] text-emerald-300 bg-emerald-500/10 border-emerald-500/20">{entry.memorySystem.replace(/_/g, ' ')}</span>}
-        {entry.memoryOperation && <span className="px-1.5 py-0.5 rounded border text-[10px] text-emerald-300 bg-emerald-500/10 border-emerald-500/20">{entry.memoryOperation.replace(/_/g, ' ')}</span>}
+        {entry.memorySystem && <span className="px-1.5 py-0.5 rounded border text-[10px] text-emerald-300 bg-emerald-500/10 border-emerald-500/20">{getMemorySystemKindLabel(entry.memorySystem)}</span>}
+        {entry.memoryOperation && <span className="px-1.5 py-0.5 rounded border text-[10px] text-emerald-300 bg-emerald-500/10 border-emerald-500/20">{getMemoryOperationLabel(entry.memoryOperation)}</span>}
         {entry.fanoutSourceNode && <span className="px-1.5 py-0.5 rounded border text-[10px] text-sky-300 bg-sky-500/10 border-sky-500/20">fanout:{entry.fanoutSourceNode}</span>}
         {typeof entry.fanoutIndex === 'number' && <span className="px-1.5 py-0.5 rounded border text-[10px] text-sky-300 bg-sky-500/10 border-sky-500/20">worker #{entry.fanoutIndex}</span>}
       </div>
@@ -394,8 +404,8 @@ function LogEntryCard({ entry, hoveredNodeId, lockedNodeId, onFocusNode, onHover
           {entry.nodeType && <span>type: {entry.nodeType}</span>}
           {entry.executionPlacement && <span>placement: {entry.executionPlacement}</span>}
           {entry.executionFlavor && <span>flavor: {entry.executionFlavor}</span>}
-          {entry.memoryAccessModel && <span>memory: {entry.memoryAccessModel}</span>}
-          {entry.storeBackend && <span>store: {entry.storeBackend}</span>}
+          {entry.memoryAccessModel && <span>memory: {getMemoryAccessModelLabel(entry.memoryAccessModel)}</span>}
+          {entry.storeBackend && <span>store: {getStoreBackendLabel(entry.storeBackend)}</span>}
         </div>
       )}
       {toolObservation && (
@@ -604,6 +614,12 @@ export default function RunPanel() {
       value: !requiresShellArming ? 'not needed' : activeTab?.runtimeSettings?.shellExecutionEnabled ? 'armed' : 'off',
       help: !requiresShellArming ? 'No explicit shell tool is present in the current graph.' : activeTab?.runtimeSettings?.shellExecutionEnabled ? 'Bounded shell execution is armed for this graph.' : 'Shell tools stay blocked until the graph runtime setting explicitly arms them.',
     },
+    {
+      label: 'Active run ownership',
+      tone: 'info' as const,
+      value: 'one active Run session / backend process',
+      help: 'Async branches inside one graph are still fine. The current limit is only about multiple separate Run sessions sharing the same backend process: another tab or project using this backend will get runner_busy until the active session finishes or stops.',
+    },
   ];
 
   const resolveDefaultTab = (): RunTab => (
@@ -628,6 +644,7 @@ export default function RunPanel() {
   const lastDone = [...runLogs].reverse().find((log) => log.type === 'completed');
   const latestError = [...runLogs].reverse().find((log) => log.type === 'error');
   const latestStarted = [...runLogs].reverse().find((log) => log.type === 'started');
+  const latestErrorHint = useMemo(() => (latestError ? getActionableIssueHint(latestError) : null), [latestError]);
   const primaryOutput = useMemo(() => derivePrimaryOutput(liveState), [liveState]);
 
   const executionTimeline = useMemo(() => deriveExecutionTimeline(edges, runLogs, { isRunning, isPaused, pendingNodeId, scheduledNodeIds: liveStateNext }), [edges, runLogs, isRunning, isPaused, pendingNodeId, liveStateNext]);
@@ -1136,14 +1153,29 @@ export default function RunPanel() {
                   </div>
 
                   {(latestError || isPaused) && (
-                    <div className={`rounded-xl border p-4 space-y-2 ${latestError ? 'border-red-500/25 bg-red-500/10' : 'border-amber-500/25 bg-amber-500/10'}`}>
+                    <div className={`rounded-xl border p-4 space-y-2 ${latestError ? 'border-red-500/25 bg-red-500/10' : 'border-amber-500/25 bg-amber-500/10'}`} data-testid={latestError ? 'runtime-latest-issue-card' : 'runtime-awaiting-resume-card'}>
                       <div className="flex items-center gap-2 text-sm font-medium text-white">
                         {latestError ? <AlertCircle size={14} className="text-red-300" /> : <PauseCircle size={14} className="text-amber-300" />}
                         <span>{latestError ? 'Latest issue' : 'Awaiting resume input'}</span>
+                        {latestError?.reasonCode && (
+                          <span className="px-1.5 py-0.5 rounded border text-[10px] text-red-200 bg-red-500/10 border-red-500/20">
+                            {latestError.reasonCode}
+                          </span>
+                        )}
                       </div>
                       <div className="text-[12px] text-slate-200 whitespace-pre-wrap break-words">
                         {latestError?.message || `The runtime is waiting for a response on node ${pendingNodeId || '—'}.`}
                       </div>
+                      {latestErrorHint && (
+                        <div className="rounded-lg border border-red-500/20 bg-black/20 px-3 py-2 space-y-1" data-testid="runtime-latest-issue-hint">
+                          <div className="text-[11px] font-medium text-red-100">{latestErrorHint.title}</div>
+                          <ul className="space-y-1 text-[10px] leading-5 text-slate-200">
+                            {latestErrorHint.lines.map((line) => (
+                              <li key={line}>• {line}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

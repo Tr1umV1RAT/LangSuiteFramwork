@@ -98,6 +98,7 @@ export default function ProjectManager() {
   const [search, setSearch] = useState('');
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const [showAdvancedProjectTypes, setShowAdvancedProjectTypes] = useState(false);
 
   useEffect(() => { if (projectManagerOpen) void loadProjects(); }, [projectManagerOpen]);
 
@@ -175,13 +176,33 @@ export default function ProjectManager() {
           </div>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2">
-              <button onClick={() => handleNewProject('langgraph')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-600 hover:bg-blue-500 text-white transition-all"><GitBranch size={12} />LangGraph <span className="text-[10px] text-emerald-200/90">recommended</span></button>
-              <button onClick={() => handleNewProject('langchain')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-sky-500/20 bg-sky-500/10 hover:bg-sky-500/20 text-sky-100 transition-all"><Bot size={12} />LangChain <span className="text-[10px] text-slate-300">advanced</span></button>
-              <button onClick={() => handleNewProject('deepagents')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-violet-500/20 bg-violet-500/10 hover:bg-violet-500/20 text-violet-100 transition-all"><BrainCircuit size={12} />DeepAgents <span className="text-[10px] text-slate-300">experimental</span></button>
+              <button onClick={() => handleNewProject('langgraph')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-600 hover:bg-blue-500 text-white transition-all" data-testid="project-manager-primary-langgraph"><GitBranch size={12} />LangGraph <span className="text-[10px] text-emerald-200/90">recommended</span></button>
+              <button
+                onClick={() => setShowAdvancedProjectTypes((value) => !value)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-panel-border bg-black/20 hover:bg-panel-hover text-slate-200 transition-all"
+                aria-expanded={showAdvancedProjectTypes}
+                data-testid="project-manager-toggle-advanced-types"
+              >
+                {showAdvancedProjectTypes ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                Advanced project types
+              </button>
             </div>
             <button onClick={toggleProjectManager} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-panel-hover transition-all"><X size={16} /></button>
           </div>
         </div>
+        {showAdvancedProjectTypes && (
+          <div className="px-5 py-3 border-b border-panel-border bg-black/15 space-y-2" data-testid="project-manager-advanced-project-types">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+              <span className="px-2 py-0.5 rounded-full border border-amber-500/20 bg-amber-500/10 text-[10px] uppercase tracking-wide text-amber-300">Advanced authoring only when needed</span>
+              <span>These entries stay available, but they are intentionally secondary to the LangGraph first-success path.</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button onClick={() => handleNewProject('langchain')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-sky-500/20 bg-sky-500/10 hover:bg-sky-500/20 text-sky-100 transition-all" data-testid="project-manager-advanced-langchain"><Bot size={12} />LangChain <span className="text-[10px] text-slate-300">editor-first</span></button>
+              <button onClick={() => handleNewProject('deepagents')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-violet-500/20 bg-violet-500/10 hover:bg-violet-500/20 text-violet-100 transition-all" data-testid="project-manager-advanced-deepagents"><BrainCircuit size={12} />DeepAgents <span className="text-[10px] text-slate-300">trunk-backed</span></button>
+            </div>
+          </div>
+        )}
+
         <div className="px-5 py-3 border-b border-panel-border space-y-2">
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />

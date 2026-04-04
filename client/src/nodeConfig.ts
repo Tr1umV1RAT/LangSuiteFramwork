@@ -466,7 +466,7 @@ export const NODE_DEFS: Record<string, NodeTypeDef> = {
 
   rag_retriever_local: {
     type: 'rag_retriever_local',
-    label: 'RAG Local',
+    label: 'Local RAG Retrieval',
     icon: Database,
     category: 'Data',
     color: '#10b981',
@@ -476,8 +476,8 @@ export const NODE_DEFS: Record<string, NodeTypeDef> = {
       { id: 'documents_out', label: 'Documents', type: 'source', position: 'right', color: MODALITY_COLORS.json, modality: 'json' },
     ],
     fields: [
-      { key: 'db_path', label: 'DB Path', type: 'text', placeholder: './local_chroma_db', defaultValue: './local_chroma_db' },
-      { key: 'collection_name', label: 'Collection', type: 'text', placeholder: 'knowledge_base', defaultValue: 'knowledge_base' },
+      { key: 'db_path', label: 'Vector DB Path', type: 'text', placeholder: './local_chroma_db', defaultValue: './local_chroma_db' },
+      { key: 'collection_name', label: 'Vector Collection', type: 'text', placeholder: 'knowledge_base', defaultValue: 'knowledge_base' },
       { key: 'top_k', label: 'Top-K', type: 'number', min: 1, max: 20, step: 1, defaultValue: 4 },
     ],
     advancedFields: [
@@ -795,7 +795,7 @@ export const NODE_DEFS: Record<string, NodeTypeDef> = {
 
   memory_checkpoint: {
     type: 'memory_checkpoint',
-    label: 'Checkpoint',
+    label: 'Checkpoint Marker',
     icon: SaveAll,
     category: 'Memory',
     color: '#22d3ee',
@@ -811,7 +811,7 @@ export const NODE_DEFS: Record<string, NodeTypeDef> = {
 
   memoryreader: {
     type: 'memoryreader',
-    label: 'Memory Read Helper',
+    label: 'Store Read Helper',
     icon: BookOpen,
     category: 'Memory',
     color: '#06b6d4',
@@ -871,7 +871,7 @@ export const NODE_DEFS: Record<string, NodeTypeDef> = {
 
   memorywriter: {
     type: 'memorywriter',
-    label: 'Memory Write Helper',
+    label: 'Store Write Helper',
     icon: PenLine,
     category: 'Memory',
     color: '#0891b2',

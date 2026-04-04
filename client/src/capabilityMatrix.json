@@ -524,7 +524,7 @@
       "origin": "langgraph",
       "kind": "composite",
       "executionPlacement": "memory",
-      "summary": "Local vector retrieval against a persisted Chroma store.",
+      "summary": "Local RAG retrieval against a persisted Chroma vector index. Uses a separate embedding model and does not read the runtime store or checkpoint state directly.",
       "quickProps": [
         "rag",
         "retrieval",
@@ -646,7 +646,7 @@
       "origin": "langgraph",
       "kind": "composite",
       "executionPlacement": "memory",
-      "summary": "Cross-thread store/profile read in the current runtime; use this for user/profile-scoped long-lived store access rather than lightweight helper reads.",
+      "summary": "Cross-thread runtime-store/profile read. Use this for long-lived user/profile store access, not for checkpoint peeks or vector retrieval.",
       "quickProps": [
         "memory",
         "store",
@@ -703,7 +703,7 @@
       "origin": "shared",
       "kind": "composite",
       "executionPlacement": "memory",
-      "summary": "Lightweight helper read surface. In the current build it still resolves through the runtime store rather than peeking raw checkpoint/thread state.",
+      "summary": "Legacy helper alias for a bounded runtime-store key read. It does not peek raw checkpoint/thread state and it is not vector retrieval.",
       "quickProps": [
         "memory",
         "read"
@@ -746,7 +746,7 @@
       "origin": "shared",
       "kind": "composite",
       "executionPlacement": "memory",
-      "summary": "Lightweight helper write surface. In the current build it still persists through the runtime store rather than mutating checkpoint/thread state directly.",
+      "summary": "Legacy helper alias for a bounded runtime-store key write. It does not mutate checkpoint/thread state directly.",
       "quickProps": [
         "memory",
         "write"
@@ -1103,7 +1103,7 @@
       "origin": "langgraph",
       "kind": "primitive",
       "executionPlacement": "memory",
-      "summary": "Checkpoint marker that enables pause/resume and per-thread persistence behavior.",
+      "summary": "Graph-scope checkpoint marker. Enables per-thread snapshots/checkpointer flow; distinct from runtime-store memory and local vector retrieval.",
       "quickProps": [
         "checkpoint",
         "thread",
@@ -1792,7 +1792,7 @@
       "kind": "primitive",
       "executionPlacement": "memory",
       "executionFlavor": "inherit",
-      "summary": "Runtime store write surface. Persists one selected state value into the current store namespace as a bounded put operation.",
+      "summary": "Runtime store write surface. Persists one selected state value into the current store namespace; distinct from checkpointing and from vector retrieval.",
       "quickProps": [
         "store",
         "write",
@@ -1845,7 +1845,7 @@
       "kind": "primitive",
       "executionPlacement": "memory",
       "executionFlavor": "inherit",
-      "summary": "Runtime store search surface. Queries the current store namespace and returns bounded normalized results to the graph state.",
+      "summary": "Runtime store search surface. Queries the current store namespace and returns bounded normalized results; distinct from vector-index retrieval.",
       "quickProps": [
         "store",
         "search",
@@ -2093,7 +2093,7 @@
       "origin": "shared",
       "kind": "composite",
       "executionPlacement": "memory",
-      "summary": "Canonical bounded memory access surface for agents/tools. Use this when you want one explicit memory payload output without choosing early between profile lookup, store get, or store search helper variants.",
+      "summary": "Canonical bounded runtime-store access surface for agents/tools. Use it when you want one explicit memory payload output without choosing early between profile lookup, store get, or store search helper variants.",
       "quickProps": [
         "memory",
         "access",

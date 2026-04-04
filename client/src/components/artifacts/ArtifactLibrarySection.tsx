@@ -46,6 +46,21 @@ function formatIntegrationModel(model?: string | null): string {
   return model || 'bridge';
 }
 
+function getBridgeModels(item: ArtifactManifestSummary): NonNullable<ArtifactManifestSummary['bridgeModels']> {
+  if (Array.isArray(item.bridgeModels) && item.bridgeModels.length > 0) return item.bridgeModels;
+  if (!item.bridgeStatus) return [];
+  return [{
+    id: `${item.kind}:${item.id}:primary`,
+    integrationModel: item.bridgeIntegrationModel || item.bridgeExecutionKind || 'lowered_bridge',
+    supportLevel: item.bridgeSupportLevel || null,
+    summary: item.bridgeSummary || null,
+    bridgeContractIds: item.bridgeContractIds || [],
+    bridgeAllowedToolFamilies: item.bridgeAllowedToolFamilies || [],
+    bridgeAcceptedSourceShape: item.bridgeAcceptedSourceShape || null,
+    bridgeRejectedReasonCodes: item.bridgeRejectedReasonCodes || [],
+  }];
+}
+
 function EmptyArtifactButton({ kind, projectMode }: { kind: ArtifactType; projectMode: ProjectMode }) {
   const openTab = useAppStore((s) => s.openTab);
   const meta = KIND_META[kind];
@@ -104,6 +119,19 @@ export default function ArtifactLibrarySection() {
     return orderedKinds.map((kind) => ({ kind, items: filtered.filter((item) => item.kind === kind) })).filter((group) => group.items.length > 0);
   }, [items, query, activeArtifactType, includeAdvanced, activeProjectMode]);
 
+  const bridgeReadyAgents = useMemo(() => {
+    if (activeProjectMode !== 'langgraph' || includeAdvanced) return [];
+    const filtered = items.filter((item) => {
+      const hay = `${item.title} ${item.description} ${item.kind}`.toLowerCase();
+      return hay.includes(query.toLowerCase());
+    });
+    return filtered.filter((item) => {
+      if (item.kind !== 'agent' || !item.built_in || item.projectMode !== 'langchain') return false;
+      const bridges = getBridgeModels(item);
+      return bridges.some((bridge) => bridge.supportLevel === 'compile_capable' && (bridge.integrationModel === 'embedded_native' || bridge.integrationModel === 'lowered_bridge'));
+    });
+  }, [items, query, activeProjectMode, includeAdvanced]);
+
   const openArtifact = async (kind: ArtifactKind, id: string) => {
     try {
       const manifest = await fetchArtifactManifest(kind, id);
@@ -140,11 +168,56 @@ export default function ArtifactLibrarySection() {
             ? 'LangChain mode is editor-first: author, save, and export/package bounded agent artifacts here. In-app runtime stays disabled.'
             : includeAdvanced
               ? 'Advanced mode adds bounded rail starters and bridgeable artifacts. They remain trunk-dependent unless a bridge or contract explicitly proves more.'
-              : 'Default mode keeps the library on the proven mode surface.'}
+              : 'Default mode keeps the library on the proven mode surface, while a small bridge-ready agent shelf can expose already-proven LangChain inserts into LangGraph.'}
         </div>
         {includeAdvanced && (
           <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-2.5 py-2 text-[10px] leading-5 text-amber-100" data-testid="artifact-library-advanced-note">
             Advanced library view is for bounded starters, wrappers, and bridgeable artifacts. It does not imply peer native runtime parity with the LangGraph trunk.
+          </div>
+        )}
+        {!includeAdvanced && activeProjectMode === 'langgraph' && bridgeReadyAgents.length > 0 && (
+          <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-2.5 py-2 space-y-2" data-testid="artifact-library-bridge-ready-agents">
+            <div className="text-[10px] uppercase tracking-wide text-cyan-200">Bridge-ready agent inserts</div>
+            <div className="text-[10px] leading-5 text-cyan-100/85">These are bounded LangChain-authored agent artifacts that already have compile-capable bridge contracts into the LangGraph trunk. Use this shelf when you need one of those agent forms inside a graph-first workflow, without switching the whole project into LangChain mode.</div>
+            <div className="flex flex-wrap gap-2">
+              {bridgeReadyAgents.map((item) => {
+                const bridges = getBridgeModels(item);
+                const embeddedBridge = bridges.find((bridge) => bridge.integrationModel === 'embedded_native' && bridge.supportLevel === 'compile_capable');
+                const loweredBridge = bridges.find((bridge) => bridge.integrationModel === 'lowered_bridge' && bridge.supportLevel === 'compile_capable');
+                return (
+                  <div key={`bridge-ready:${item.id}`} className="rounded-lg border border-cyan-500/20 bg-black/15 px-2.5 py-2 text-[10px] text-slate-200 space-y-1">
+                    <div className="font-medium text-cyan-100">{item.title}</div>
+                    <div className="text-slate-400 leading-5">{item.bridgeSummary || item.surfaceSummary || 'Bounded bridge-backed LangChain agent artifact.'}</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {embeddedBridge && (
+                        <button
+                          onClick={() => addArtifactWrapperNode(item.kind as ArtifactType, item.id, item.title, 'embedded_native')}
+                          className="px-2 py-1 rounded text-[10px] border border-emerald-500/20 text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 transition-all inline-flex items-center gap-1"
+                        >
+                          <WrapText size={10} />
+                          Insert embedded
+                        </button>
+                      )}
+                      {loweredBridge && (
+                        <button
+                          onClick={() => addArtifactWrapperNode(item.kind as ArtifactType, item.id, item.title, 'lowered_bridge')}
+                          className="px-2 py-1 rounded text-[10px] border border-cyan-500/20 text-cyan-300 bg-cyan-500/10 hover:bg-cyan-500/20 transition-all inline-flex items-center gap-1"
+                        >
+                          <WrapText size={10} />
+                          Insert lowered
+                        </button>
+                      )}
+                      <button
+                        onClick={() => void openArtifact(item.kind, item.id)}
+                        className="px-2 py-1 rounded text-[10px] border border-panel-border text-slate-200 hover:bg-white/5 transition-all"
+                      >
+                        Open editable copy
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
         <div className="flex flex-wrap gap-2">
@@ -179,20 +252,7 @@ export default function ArtifactLibrarySection() {
               <div className="space-y-2">
                 {group.items.map((item) => {
                   const surfaceLevel = (item.surfaceLevel || 'stable') as SurfaceLevel;
-                  const bridgeModels = Array.isArray(item.bridgeModels) && item.bridgeModels.length > 0
-                    ? item.bridgeModels
-                    : item.bridgeStatus
-                      ? [{
-                          id: `${item.kind}:${item.id}:primary`,
-                          integrationModel: item.bridgeIntegrationModel || item.bridgeExecutionKind || 'lowered_bridge',
-                          supportLevel: item.bridgeSupportLevel || null,
-                          summary: item.bridgeSummary || null,
-                          bridgeContractIds: item.bridgeContractIds || [],
-                          bridgeAllowedToolFamilies: item.bridgeAllowedToolFamilies || [],
-                          bridgeAcceptedSourceShape: item.bridgeAcceptedSourceShape || null,
-                          bridgeRejectedReasonCodes: item.bridgeRejectedReasonCodes || [],
-                        }]
-                      : [];
+                  const bridgeModels = getBridgeModels(item);
                   const embeddedBridge = bridgeModels.find((bridge) => bridge.integrationModel === 'embedded_native' && bridge.supportLevel === 'compile_capable');
                   const loweredBridge = bridgeModels.find((bridge) => bridge.integrationModel === 'lowered_bridge' && bridge.supportLevel === 'compile_capable');
                   return (

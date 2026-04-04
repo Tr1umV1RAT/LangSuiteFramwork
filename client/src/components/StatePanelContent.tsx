@@ -3,10 +3,12 @@ import { useAppStore, type GraphBinding, type ArtifactType, type ExecutionProfil
 import { saveArtifactManifest } from '../api/artifacts';
 import { Database, Plus, Trash2, Eye, ChevronDown, ChevronRight, Workflow, Cpu, Boxes, LibraryBig, UploadCloud, Lock, LockOpen, BookOpen, Wand2, PackagePlus } from 'lucide-react';
 import CapabilityInspectorSection from './CapabilityInspectorSection';
+import SurfaceTruthBadges from './SurfaceTruthBadges';
 import { ARTIFACT_KIND_META, BLOCK_FAMILY_BADGE_CLASSES, BLOCK_FAMILY_LABELS, EXECUTION_PROFILE_META, getArtifactOptionsForEditor, getExecutionProfileOptionsForEditor, inferNodeBlockFamily, getNodeRuntimeMetaMatrix } from '../capabilities';
 import { describeToolObservationCounts, parseToolObservation, summarizeToolObservation } from '../executionTruth';
 import { deriveExecutionTimeline } from '../executionTimeline';
 import { applyModuleDefinitionToRuntimeSettings, buildModuleLibraryEntryFromRuntimeSettings, buildPromptAssignmentTargetKey, buildSurfaceTruthSummary, extractPromptStripVariables, getLocalPromptForNode, getPromptAssignmentsForTarget, isPromptCapableNodeType, resolvePromptStripsForNodeTarget, resolvePromptStripsForSubagentTarget, resolvePromptStripsForTarget } from '../store/workspace';
+import { getMemoryAccessModelLabel, getMemoryDurabilityLabel, getMemoryRoleLabel, getMemorySurfaceLabel, getMemorySystemKindLabel, getPreferredMemorySurfaceLabel, getStoreBackendLabel, getMemoryOperationLabel, getMemoryLaneDescription, getMemoryLaneId, getMemoryLaneLabel, getMemoryLanePriority } from '../memorySurfaceLabels';
 
 const STATE_KEY_PARAMS = [
   'output_key', 'input_key', 'state_key', 'target_key',
@@ -1641,11 +1643,7 @@ export default function StatePanelContent() {
                       <UploadCloud size={12} /> {publishing ? 'Publication...' : 'Publier dans la bibliothèque'}
                     </button>
                     <div className="rounded-lg border border-panel-border bg-black/20 px-2.5 py-2 text-[10px] leading-5 text-slate-400" data-testid="artifact-publish-truth">
-                      <div className="flex flex-wrap gap-2 mb-1.5">
-                        <span className={`px-1.5 py-0.5 rounded border ${activeSurfaceTruth.compileSafe ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-200' : 'border-red-500/20 bg-red-500/10 text-red-200'}`}>{activeSurfaceTruth.compileSafe ? 'compile-safe' : 'not compile-safe'}</span>
-                        <span className={`px-1.5 py-0.5 rounded border ${activeSurfaceTruth.editorOnly ? 'border-amber-500/20 bg-amber-500/10 text-amber-200' : 'border-cyan-500/20 bg-cyan-500/10 text-cyan-200'}`}>{activeSurfaceTruth.editorOnly ? 'editor-first' : 'runtime-enabled'}</span>
-                        <span className="px-1.5 py-0.5 rounded border border-panel-border text-slate-300">mode: {activeSurfaceTruth.projectMode}</span>
-                      </div>
+                      <SurfaceTruthBadges surfaceTruth={activeSurfaceTruth} className="mb-1.5" showArtifact={false} />
                       <div>{publishEffectSummary}</div>
                     </div>
                 {publishMessage && <div className="text-[10px] text-slate-500">{publishMessage}</div>}
@@ -2061,18 +2059,39 @@ function MemorySurfaceList({ memorySurfaces }: { memorySurfaces: MemorySurfaceSu
 
   const primarySurfaces = memorySurfaces.filter((surface) => !surface.legacyHelperSurface);
   const legacySurfaces = memorySurfaces.filter((surface) => surface.legacyHelperSurface);
+  const groupedPrimarySurfaces = primarySurfaces.reduce<Record<string, MemorySurfaceSummary[]>>((acc, surface) => {
+    const lane = getMemoryLaneId(surface.nodeType, {
+      memorySystemKind: surface.systemKind,
+      memoryAccessModel: surface.accessModel,
+      memoryRole: surface.role,
+      legacyHelperSurface: surface.legacyHelperSurface,
+      memoryConsumer: surface.sourceKind === 'memory_consumer',
+    });
+    acc[lane] = acc[lane] || [];
+    acc[lane].push(surface);
+    return acc;
+  }, {});
+  const orderedPrimaryGroups = Object.entries(groupedPrimarySurfaces)
+    .sort((a, b) => getMemoryLanePriority(a[0] as never) - getMemoryLanePriority(b[0] as never))
+    .map(([lane, surfaces]) => ({
+      lane,
+      label: getMemoryLaneLabel(lane as never),
+      description: getMemoryLaneDescription(lane as never),
+      surfaces: surfaces.sort((a, b) => a.label.localeCompare(b.label)),
+    }));
 
   const renderSurface = (surface: MemorySurfaceSummary) => (
     <div key={surface.id} className="rounded-lg border border-panel-border bg-black/20 p-2 space-y-1.5 text-[11px]">
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="font-medium text-slate-100">{surface.label}</span>
+        <span className="font-medium text-slate-100">{getMemorySurfaceLabel(surface.nodeType, surface.label)}</span>
         <span className={`px-1.5 py-0.5 rounded border text-[10px] ${BLOCK_FAMILY_BADGE_CLASSES[surface.blockFamily]}`}>{BLOCK_FAMILY_LABELS[surface.blockFamily]}</span>
-        <span className="px-1.5 py-0.5 rounded border text-[10px] text-cyan-300 bg-cyan-500/10 border-cyan-500/20">{surface.systemKind.replace(/_/g, ' ')}</span>
+        <span className="px-1.5 py-0.5 rounded border text-[10px] text-indigo-300 bg-indigo-500/10 border-indigo-500/20">{getMemoryLaneLabel(getMemoryLaneId(surface.nodeType, { memorySystemKind: surface.systemKind, memoryAccessModel: surface.accessModel, memoryRole: surface.role, legacyHelperSurface: surface.legacyHelperSurface, memoryConsumer: surface.sourceKind === 'memory_consumer' }))}</span>
+        <span className="px-1.5 py-0.5 rounded border text-[10px] text-cyan-300 bg-cyan-500/10 border-cyan-500/20">{getMemorySystemKindLabel(surface.systemKind)}</span>
         {surface.legacyHelperSurface && (
           <span className="px-1.5 py-0.5 rounded border text-[10px] text-amber-300 bg-amber-500/10 border-amber-500/20">Legacy helper</span>
         )}
         {surface.preferredSurface && surface.preferredSurface !== 'this_node' && (
-          <span className="px-1.5 py-0.5 rounded border text-[10px] text-emerald-300 bg-emerald-500/10 border-emerald-500/20">Préférer {surface.preferredSurface}</span>
+          <span className="px-1.5 py-0.5 rounded border text-[10px] text-emerald-300 bg-emerald-500/10 border-emerald-500/20">Préférer {getPreferredMemorySurfaceLabel(surface.preferredSurface)}</span>
         )}
         {surface.preferredSurface === 'this_node' && !surface.legacyHelperSurface && (
           <span className="px-1.5 py-0.5 rounded border text-[10px] text-emerald-300 bg-emerald-500/10 border-emerald-500/20">Surface recommandée</span>
@@ -2081,21 +2100,22 @@ function MemorySurfaceList({ memorySurfaces }: { memorySurfaces: MemorySurfaceSu
       <div className="text-[10px] text-slate-400 leading-5">{surface.summary}</div>
       {surface.legacyHelperSurface && surface.preferredSurface && surface.preferredSurface !== 'this_node' && (
         <div className="rounded-md border border-amber-500/20 bg-amber-500/5 px-2 py-1.5 text-[10px] text-slate-300 leading-5">
-          Cette surface reste utilisable, mais elle fait partie des helpers historiques. Pour un usage plus clair dans l’éditeur actuel, préfère <code>{surface.preferredSurface}</code>.
+          Cette surface reste utilisable, mais elle fait partie des helpers historiques. Pour un usage plus clair dans l’éditeur actuel, préfère <code>{getPreferredMemorySurfaceLabel(surface.preferredSurface)}</code>.
         </div>
       )}
       <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-500">
-        <div>Durabilité: <span className="text-slate-300">{surface.durability.replace(/_/g, ' ')}</span></div>
+        <div>Lane: <span className="text-slate-300">{getMemoryLaneLabel(getMemoryLaneId(surface.nodeType, { memorySystemKind: surface.systemKind, memoryAccessModel: surface.accessModel, memoryRole: surface.role, legacyHelperSurface: surface.legacyHelperSurface, memoryConsumer: surface.sourceKind === 'memory_consumer' }))}</span></div>
+        <div>Durabilité: <span className="text-slate-300">{getMemoryDurabilityLabel(surface.durability)}</span></div>
         <div>Projection: <span className="text-slate-300">{surface.visibility.replace(/_/g, ' ')}</span></div>
-        <div>Rôle: <span className="text-slate-300">{surface.role ? surface.role.replace(/_/g, ' ') : '—'}</span></div>
-        <div>Accès: <span className="text-slate-300">{surface.accessModel ? surface.accessModel.replace(/_/g, ' ') : '—'}</span></div>
-        <div>Surface conseillée: <span className="text-slate-300">{surface.preferredSurface ? (surface.preferredSurface === 'this_node' ? 'this node' : surface.preferredSurface) : '—'}</span></div>
+        <div>Rôle: <span className="text-slate-300">{getMemoryRoleLabel(surface.role)}</span></div>
+        <div>Accès: <span className="text-slate-300">{getMemoryAccessModelLabel(surface.accessModel)}</span></div>
+        <div>Surface conseillée: <span className="text-slate-300">{getPreferredMemorySurfaceLabel(surface.preferredSurface)}</span></div>
         <div>Dernière mise à jour: <span className="text-slate-300">{formatTimestamp(surface.lastUpdatedAt)}</span></div>
-        <div>Dernière opération: <span className="text-slate-300">{surface.lastOperation ? surface.lastOperation.replace(/_/g, ' ') : '—'}</span></div>
+        <div>Dernière opération: <span className="text-slate-300">{getMemoryOperationLabel(surface.lastOperation)}</span></div>
         {surface.outputKey && <div>Clé sortie: <span className="text-slate-300 font-mono">{surface.outputKey}</span></div>}
         {surface.stateKey && <div>Clé source: <span className="text-slate-300 font-mono">{surface.stateKey}</span></div>}
         {surface.namespaceHint && <div className="col-span-2">Namespace / hint: <span className="text-slate-300 font-mono break-all">{surface.namespaceHint}</span></div>}
-        {surface.storeBackend && <div>Backend store: <span className="text-slate-300">{surface.storeBackend}</span></div>}
+        {surface.storeBackend && <div>Backend store: <span className="text-slate-300">{getStoreBackendLabel(surface.storeBackend)}</span></div>}
         {surface.storePath && <div className="col-span-2">Store path: <span className="text-slate-300 font-mono break-all">{surface.storePath}</span></div>}
       </div>
       {surface.sourceKind === 'memory_consumer' && surface.sourceLabels && surface.sourceLabels.length > 0 && (
@@ -2113,12 +2133,20 @@ function MemorySurfaceList({ memorySurfaces }: { memorySurfaces: MemorySurfaceSu
   return (
     <div className="space-y-3">
       <div className="text-[10px] text-slate-500 leading-5">
-        Les mémoires affichées ici reflètent les <strong className="text-slate-300">surfaces runtime</strong> réellement présentes dans le scope: checkpoint thread, store, retrieval, trimming de contexte, ou consommation via <code>memory_in</code>. Les surfaces primaires sont affichées d’abord, puis les helpers legacy quand ils existent encore dans le graphe.
+Les mémoires affichées ici reflètent les <strong className="text-slate-300">surfaces runtime</strong> réellement présentes dans le scope. Le premier plan reste séparé en <strong className="text-slate-300">Checkpointing / thread state</strong>, <strong className="text-slate-300">Runtime store — canonical</strong> puis <strong className="text-slate-300">Local RAG / embeddings</strong>. Ici, le RAG local désigne bien une requête d'un <strong className="text-slate-300">index vectoriel avec embeddings</strong>, distincte du runtime store et des snapshots de thread. Les surfaces canoniques et explicites sont triées par lane avant les helpers legacy pour rendre la lecture et la reprise de graphe plus nettes.
       </div>
-      {primarySurfaces.length > 0 && (
-        <div className="space-y-2">
+      {orderedPrimaryGroups.length > 0 && (
+        <div className="space-y-3">
           <div className="text-[10px] uppercase tracking-wide text-slate-500">Surfaces principales</div>
-          {primarySurfaces.map(renderSurface)}
+          {orderedPrimaryGroups.map((group) => (
+            <div key={group.lane} className="space-y-2">
+              <div className="rounded-lg border border-panel-border bg-black/10 px-2.5 py-2 text-[10px] text-slate-400 leading-5">
+                <div className="uppercase tracking-wide text-slate-500 mb-1">{group.label}</div>
+                <div>{group.description}</div>
+              </div>
+              {group.surfaces.map(renderSurface)}
+            </div>
+          ))}
         </div>
       )}
       {legacySurfaces.length > 0 && (

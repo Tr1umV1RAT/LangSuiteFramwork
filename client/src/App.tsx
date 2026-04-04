@@ -496,7 +496,7 @@ export default function App() {
               <div className="mt-5 rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-4" data-testid="recommended-path-card">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="px-2 py-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 text-[10px] uppercase tracking-wide text-emerald-300">Primary path</span>
-                  <span className="text-[11px] text-slate-400">Start with the proven LangGraph trunk, then opt into advanced bridges only when needed.</span>
+                  <span className="text-[11px] text-slate-400">Start with the proven LangGraph trunk, then reveal advanced project types only when you actually need them.</span>
                 </div>
                 <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-300">
                   <div className="rounded-lg border border-panel-border bg-black/20 px-3 py-2">1. Create or open a LangGraph graph/subgraph.</div>
@@ -508,6 +508,13 @@ export default function App() {
                 </div>
               </div>
 
+              <div className="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-100/90" data-testid="empty-state-advanced-rail-note">
+                Need LangChain or DeepAgents authoring later? Open <span className="font-medium text-amber-200">Projects → Advanced project types</span> after the graph-first path is clear.
+              </div>
+
+              <div className="mt-3 rounded-xl border border-cyan-500/20 bg-cyan-500/5 px-3 py-2 text-[11px] text-cyan-100/90" data-testid="empty-state-bridge-agent-note">
+                Need a bounded LangChain agent inside a LangGraph workflow? Open <span className="font-medium text-cyan-200">Artifacts & starters</span> and use the <span className="font-medium text-cyan-200">bridge-ready agent inserts</span> instead of switching the whole project path.
+              </div>
 
               <div className="mt-3 flex flex-wrap gap-2" data-testid="empty-state-starters">
                 <button

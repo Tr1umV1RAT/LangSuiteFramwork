@@ -10,6 +10,7 @@ import {
   type WorkspacePreset,
 } from '../store';
 import { buildProjectPersistenceSummary } from '../store/workspace';
+import ProjectPersistenceTruthBlock from './ProjectPersistenceTruthBlock';
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -68,7 +69,7 @@ function ChoiceGroup<T extends string>({ value, onChange, options }: { value: T;
 
 const PRESETS: { value: WorkspacePreset; label: string; hint: string }[] = [
   { value: 'graph_simple', label: 'Graph Simple', hint: 'Compact graph-first editing with a calm palette and restrained metadata.' },
-  { value: 'graph_memory', label: 'Graph + Memory', hint: 'Keeps the graph workflow simple while surfacing memory/RAG building blocks earlier.' },
+  { value: 'graph_memory', label: 'Graph + Memory', hint: 'Keeps the graph workflow simple while surfacing the execution-memory lanes earlier: checkpointing first, then canonical runtime-store access, then local RAG / embeddings retrieval.' },
   { value: 'debug_build', label: 'Debug Build', hint: 'Execution-first preset with broader palette exposure and visible technical cues.' },
   { value: 'advanced_authoring', label: 'Advanced Authoring', hint: 'Keeps the richer suite/editor semantics visible for deeper authoring.' },
 ];
@@ -263,7 +264,7 @@ export default function SettingsShell({ open, onClose }: { open: boolean; onClos
                 ]}
               />
             </Field>
-            <Field label="Default palette preset" hint="A light preset filter for day-to-day authoring. Advanced leaves the catalog broadly open.">
+            <Field label="Default palette preset" hint="A light preset filter for day-to-day authoring. Memory / RAG now centers checkpointing, canonical runtime-store access, and local embeddings retrieval before legacy helpers. Advanced leaves the catalog broadly open.">
               <ChoiceGroup<PalettePreset>
                 value={preferences.palettePreset}
                 onChange={(value) => updatePreferences({ palettePreset: value })}
@@ -290,20 +291,13 @@ export default function SettingsShell({ open, onClose }: { open: boolean; onClos
           </Section>
 
           <Section title="Persistence and export">
-            <Field label="Save project in app" hint="Updates the saved project tree in the local app database. Useful for collaboration/session work and the project manager tree.">
-              <div className="text-[11px] leading-relaxed text-slate-400">
-                This persists the editable workspace structure the app actually knows today: root graph, known child subgraphs, reopening metadata, and saved graph settings.
-              </div>
+            <Field label="Project persistence truth" hint="Save in app and Open in Projects preserve the editable workspace tree only.">
+              <ProjectPersistenceTruthBlock summary={projectPersistence} testIdPrefix="settings-project-persistence" />
             </Field>
             <Field label="Project package" hint="Portable JSON package for the editable workspace only.">
               <div className="flex items-start gap-2 text-[11px] leading-relaxed text-slate-400">
                 <Package size={14} className="mt-0.5 text-blue-300 shrink-0" />
                 <span>Export/import packages do not include runtime DB contents, vector stores, or hidden environment snapshots. They are honest workspace packages, not magical freeze-dried universes.</span>
-              </div>
-            </Field>
-            <Field label="Open saved project from app" hint="Rehydrates the saved editable workspace tree from the local app database.">
-              <div className="text-[11px] leading-relaxed text-slate-400">
-                {projectPersistence.openEffectSummary}
               </div>
             </Field>
             <Field label="Compiled Python export" hint="Separate from save-in-app and separate from project packages.">
