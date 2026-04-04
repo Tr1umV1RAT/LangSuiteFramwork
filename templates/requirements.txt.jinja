@@ -1,3 +1,58 @@
+langgraph>=0.2.0
+langchain>=0.3.0
+langchain-core>=0.3.0
+langchain-community>=0.3.0
+langchain-experimental>=0.3.0
+pydantic>=2.0.0
+requests>=2.31.0
+{% if has_openai %}
+langchain-openai>=0.2.0
+{% endif %}
+{% if has_anthropic %}
+langchain-anthropic>=0.3.0
+{% endif %}
+{% if has_google_genai %}
+langchain-google-genai>=2.0.0
+{% endif %}
+{% if has_google_vertexai %}
+langchain-google-vertexai>=2.0.0
+{% endif %}
+{% if has_ollama %}
+langchain-ollama>=0.2.0
+{% endif %}
+{% if has_mistralai %}
+langchain-mistralai>=0.2.0
+{% endif %}
+{% if has_retries %}
+tenacity>=9.0.0
+{% endif %}
+{% if has_memory %}
+langgraph-checkpoint>=2.0.0
+{% endif %}
+{% if checkpoint_type == 'sqlite' %}
+langgraph-checkpoint-sqlite>=2.0.0
+{% if is_async %}
+aiosqlite>=0.20.0
+{% endif %}
+{% endif %}
+{% if has_rag %}
+langchain-huggingface>=0.1.0
+langchain-chroma>=0.2.0
+{% endif %}
+{% if has_tavily %}
+langchain-tavily>=0.1.0
+{% endif %}
+{% if has_duckduckgo %}
+duckduckgo-search>=8.1.1
+{% endif %}
+{% if has_github %}
+pygithub>=2.6.0
+{% endif %}
+{% if has_playwright %}
+playwright>=1.40.0
+lxml>=5.0.0
+beautifulsoup4>=4.12.0
+{% endif %}
 {% for requirement in runtime_requirement_specs %}
 {{ requirement }}
 {% endfor %}
