@@ -1774,6 +1774,7 @@ class ObsidianScenePatch(BaseModel):
         return v
 
 
+<<<<<<< HEAD
 class ObsidianEncounterPatch(BaseModel):
     encounterId: str
     status: Optional[str] = None
@@ -1843,6 +1844,8 @@ class ObsidianLocationPatch(BaseModel):
         return v
 
 
+=======
+>>>>>>> fc9ddc624b685644908e25620b561d1504fdab5d
 class ObsidianClockPatch(BaseModel):
     clockId: str
     status: Optional[str] = None
@@ -1946,8 +1949,11 @@ class ObsidianRecapPayload(BaseModel):
     validatedDecisions: list[str] = Field(default_factory=list)
     runtimeContextUpdates: list[ObsidianRuntimeContextPatch] = Field(default_factory=list)
     scenePatches: list[ObsidianScenePatch] = Field(default_factory=list)
+<<<<<<< HEAD
     encounterPatches: list[ObsidianEncounterPatch] = Field(default_factory=list)
     locationPatches: list[ObsidianLocationPatch] = Field(default_factory=list)
+=======
+>>>>>>> fc9ddc624b685644908e25620b561d1504fdab5d
     clockPatches: list[ObsidianClockPatch] = Field(default_factory=list)
     factionPatches: list[ObsidianFactionPatch] = Field(default_factory=list)
     hookPatches: list[ObsidianHookPatch] = Field(default_factory=list)
